@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { GlobalEmits } from '~/types'
+import type { GlobalEmits } from '../types'
 
 defineEmits<GlobalEmits>()
 </script>

@@ -1,3 +1,4 @@
+import type { Plugin as Plugin_2 } from 'vite'
 import { parse, babelParse } from '@vue/compiler-sfc'
 import { getAvailableImportsFromAst, getUsedInterfacesFromAst } from './utils'
 import { resolve, dirname, extname } from 'path'
@@ -16,7 +17,11 @@ const cache: LocalCache = {
   matcher: createMatchPath(resolve('.'), {})
 }
 
-export default function VitePluginVueTypeImports() {
+interface Plugin extends Plugin_2 {
+  name: string
+}
+
+export default function VitePluginVueTypeImports(): Plugin {
   return {
     name: 'vite-plugin-vue-type-imports',
     enforce: 'pre',
@@ -52,7 +57,7 @@ export default function VitePluginVueTypeImports() {
               currentFile = await fs.readFile(path, 'utf-8')
             }
           } else {
-            const files = await fg(`${path}.+(ts|d.ts)`)
+            const files = await fg(`${path}*.+(ts|d.ts)`)
             
             if (files.length > 0)
               currentFile = await fs.readFile(files[0], 'utf-8')

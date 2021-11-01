@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { User } from '~/types'
+import { User } from '../types'
 
 defineProps<User>()
 </script>
