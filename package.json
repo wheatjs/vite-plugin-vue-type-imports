@@ -1,6 +1,6 @@
 {
 	"name": "vite-plugin-vue-type-imports",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"types": "dist/index.d.ts",
 	"license": "MIT",
 	"author": "Jacob Clevenger <jacobrclevenger@gmail.com>",
