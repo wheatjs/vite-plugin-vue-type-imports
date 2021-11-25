@@ -51,17 +51,19 @@ export default function VitePluginVueTypeImports(): Plugin {
           const hasExtension = !!extname(path)
           let currentFile: string | undefined
 
+          
           // If the file has an extension already, then we can just check if it exists and load it.
           if (hasExtension) {
             if (existsSync(path)) {
               currentFile = await fs.readFile(path, 'utf-8')
             }
           } else {
-            const files = await fg(`${path}*.+(ts|d.ts)`)
-            
+            const files = await fg(`${path.replace(/\\/g, '/')}*.+(ts|d.ts)`, { onlyFiles: true })
+
             if (files.length > 0)
               currentFile = await fs.readFile(files[0], 'utf-8')
           }
+
 
           // Found correct file to load interface from
           if (currentFile) {
