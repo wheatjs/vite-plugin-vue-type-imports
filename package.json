@@ -61,8 +61,5 @@
   "peerDependencies": {
     "@vue/compiler-sfc": "^3.2.24",
     "vue": "^3.2.24"
-  },
-  "optionalDependencies": {
-    "@nuxt/kit": "^0.8.1-edge"
   }
 }

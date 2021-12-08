@@ -1,11 +1,8 @@
-import { extendViteConfig } from '@nuxt/kit'
 import VueTypeImports from './vite'
 
-export default {
-  setup() {
-    extendViteConfig((config) => {
-      config.plugins = config.plugins || []
-      config.plugins.unshift(VueTypeImports())
-    })
-  },
+export default function(this: any) {
+  this.nuxt.hook('vite:extend', async(vite: any) => {
+    vite.config.plugins = vite.config.plugins || []
+    vite.config.plugins.unshift(VueTypeImports())
+  })
 }
