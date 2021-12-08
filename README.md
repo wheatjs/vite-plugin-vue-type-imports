@@ -36,9 +36,9 @@ export default defineConfig({
 // nuxt.config.ts
 
 export default {
-  buildModules: {
+  buildModules: [
     'vite-plugin-vue-type-imports/nuxt',
-  }
+  ]
 }
 ```
 
