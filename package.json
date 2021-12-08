@@ -1,52 +1,67 @@
 {
-	"name": "vite-plugin-vue-type-imports",
-	"version": "0.0.3",
-	"types": "dist/index.d.ts",
-	"license": "MIT",
-	"author": "Jacob Clevenger <jacobrclevenger@gmail.com>",
-	"bugs": "https://github.com/wheatjs/vite-plugin-vue-type-imports/issues",
-	"homepage": "https://github.com/wheatjs/vite-plugin-vue-type-imports",
-	"scripts": {
-		"dev": "npm run build -- --watch",
-		"build": "tsup src/index.ts --dts --format cjs,esm",
-		"demo": "npm run build && npm run example:dev",
-		"example:dev": "npm -C example run dev",
-		"example:build": "npm -C example run build",
-		"prepublishOnly": "npm run build",
-		"release": "git-ensure --no-behind -b main --clean && bumpp --commit --tag --push"
-	},
-	"files": [
-		"dist"
-	],
-	"main": "./dist/index.js",
-	"module": "./dist/index.mjs",
-	"exports": {
-		".": {
-			"import": "./dist/index.mjs",
-			"require": "./dist/index.js"
-		}
-	},
-	"devDependencies": {
-		"@antfu/eslint-config": "^0.10.0",
-		"@babel/parser": "^7.15.8",
-		"@babel/types": "^7.15.6",
-		"@types/node": "^16.11.6",
-		"@typescript-eslint/eslint-plugin": "^5.2.0",
-		"bumpp": "^7.1.1",
-		"eslint": "^8.1.0",
-		"git-ensure": "^0.1.0",
-		"tsup": "3.12.1",
-		"typescript": "4.1.5",
-		"vite": "^2.6.13",
-		"vue": "^3.2.20"
-	},
-	"peerDependencies": {
-		"vite": "^2.6.13",
-		"vue": "^3.2.20"
-	},
-	"dependencies": {
-		"@vue/compiler-sfc": "^3.2.20",
-		"fast-glob": "^3.2.7",
-		"tsconfig-paths": "^3.11.0"
-	}
+  "name": "vite-plugin-vue-type-imports",
+  "version": "0.0.3",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "author": "Jacob Clevenger <jacobrclevenger@gmail.com>",
+  "bugs": "https://github.com/wheatjs/vite-plugin-vue-type-imports/issues",
+  "homepage": "https://github.com/wheatjs/vite-plugin-vue-type-imports",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./vite": {
+      "require": "./dist/vite.js",
+      "import": "./dist/vite.mjs"
+    },
+    "./nuxt": {
+      "require": "./dist/nuxt.js",
+      "import": "./dist/nuxt.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch src",
+    "prepublishOnly": "nr build",
+    "lint": "eslint \"**/*.{ts,vue,mjs}\"",
+    "lint:fix": "nr lint -- --fix",
+    "play": "npm -C playground run dev",
+    "play:build": "pnpm run build && npm -C playground run build",
+    "release": "git-ensure --no-behind -b main --clean && bumpp --commit --tag --push",
+    "test": "jest",
+    "test:update": "jest -u"
+  },
+  "keywords": [],
+  "devDependencies": {
+    "@antfu/eslint-config": "^0.11.1",
+    "@antfu/ni": "^0.11.0",
+    "@types/jest": "^27.0.3",
+    "@types/node": "^16.11.11",
+    "@vue/compiler-sfc": "^3.2.24",
+    "bumpp": "^7.1.1",
+    "eslint": "^8.3.0",
+    "eslint-plugin-jest": "^25.3.0",
+    "esno": "^0.12.1",
+    "fast-glob": "^3.2.7",
+    "git-ensure": "^0.1.0",
+    "jest": "^27.4.3",
+    "ts-jest": "^27.0.7",
+    "tsup": "5.6.0",
+    "typescript": "^4.5.2",
+    "vite": "^2.6.14",
+    "vue": "^3.2.24"
+  },
+  "peerDependencies": {
+    "@vue/compiler-sfc": "^3.2.24",
+    "vue": "^3.2.24"
+  },
+  "optionalDependencies": {
+    "@nuxt/kit": "^0.8.1-edge"
+  }
 }

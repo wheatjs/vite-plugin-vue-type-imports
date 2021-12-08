@@ -31,6 +31,17 @@ export default defineConfig({
 })
 ```
 
+### Nuxt
+```ts
+// nuxt.config.ts
+
+export default {
+  buildModules: {
+    'vite-plugin-vue-type-imports/nuxt',
+  }
+}
+```
+
 ## Usage
 
 ```ts
