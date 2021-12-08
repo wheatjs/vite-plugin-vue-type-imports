@@ -1,5 +1,5 @@
 import { Plugin, ResolvedConfig } from 'vite'
-import { transform } from './core/src'
+import { transform } from './core'
 
 interface Store {
   config: ResolvedConfig | null

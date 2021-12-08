@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ButtonProps } from '~/button-types'
+import { ButtonProps, ButtonEmits } from '~/button-types'
 
 defineProps<ButtonProps>()
+defineEmits<ButtonEmits>()
 </script>
 
 <template>

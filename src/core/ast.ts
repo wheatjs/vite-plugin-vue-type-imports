@@ -35,6 +35,10 @@ export interface IImport {
   path: string
 }
 
+export function extractImportNodes(ast: Program) {
+  return ast.body.filter((node): node is ImportDeclaration => node.type === 'ImportDeclaration')
+}
+
 export function getAvailableImportsFromAst(ast: Program) {
   const imports: IImport[] = []
 

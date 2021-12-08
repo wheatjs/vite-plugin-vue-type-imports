@@ -1,8 +1,10 @@
 import fs from 'node:fs/promises'
 import { AliasOptions, Alias } from 'vite'
 import { parse, babelParse } from '@vue/compiler-sfc'
-import { getUsedInterfacesFromAst, getAvailableImportsFromAst, extractTypesFromSource } from './ast'
-import { resolveModulePath, replaceAtIndexes, Replacement } from './utils'
+import { Identifier } from '@babel/types'
+import generate from '@babel/generator'
+import { getUsedInterfacesFromAst, getAvailableImportsFromAst, extractTypesFromSource, extractImportNodes } from './ast'
+import { resolveModulePath, replaceAtIndexes, Replacement, groupImports, intersect } from './utils'
 
 export interface TransformOptions {
   id: string
@@ -25,13 +27,14 @@ export async function transform(code: string, options: TransformOptions) {
    * it to an import and then load the interface from the import and inline it
    * at the top of the vue script setup.
    */
-  const resolvedTypes = (await Promise.all(imports
-    .filter(({ local }) => interfaces.includes(local))
-    .map(async(definition) => {
-      const path = await resolveModulePath(definition.path, options.id, options.aliases)
+  const resolvedTypes = (await Promise.all(Object.entries(groupImports(imports))
+    .map(async([url, importedTypes]) => {
+      const intersection = intersect(importedTypes, interfaces)
+      const path = await resolveModulePath(url, options.id, options.aliases)
+
       if (path) {
         const data = await fs.readFile(path, 'utf-8')
-        const types = (await extractTypesFromSource(data, [definition.imported], {
+        const types = (await extractTypesFromSource(data, intersection, {
           relativePath: path,
           aliases: options.aliases,
         })).reverse()
@@ -45,20 +48,34 @@ export async function transform(code: string, options: TransformOptions) {
     .filter(x => x) as [string, string][]
 
   const replacements: Replacement[] = []
+  const fullImports = extractImportNodes(ast.program)
 
   // Clean up imports
-  imports.forEach((i) => {
-    if (resolvedTypes.some(type => type[0] === i.imported)) {
+  fullImports.forEach((i) => {
+    i.specifiers = i.specifiers.filter((specifier) => {
+      if (specifier.type === 'ImportSpecifier' && specifier.imported.type === 'Identifier')
+        return !resolvedTypes.some(x => x[0] === (specifier.imported as Identifier).name)
+
+      return true
+    })
+
+    if (i.specifiers.length === 0) {
       replacements.push({
-        start: i.start,
-        end: i.end,
+        start: i.start!,
+        end: i.end!,
         replacement: '',
+      })
+    }
+    else {
+      replacements.push({
+        start: i.start!,
+        end: i.end!,
+        replacement: generate(i).code,
       })
     }
   })
 
   const transformedScriptSetup = [resolvedTypes.map(x => x[1]).join('\n'), replaceAtIndexes(scriptSetup.content, replacements)].join('\n')
-
   const transformedCode = [
     code.substring(0, scriptSetup.loc.start.offset),
     transformedScriptSetup,
