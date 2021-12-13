@@ -32,7 +32,11 @@ export function resolvePath(path: string, from: string, aliases: ((AliasOptions 
 
 export async function resolveModulePath(path: string, from: string, aliases: ((AliasOptions | undefined) & Alias[]) | undefined) {
   const maybePath = resolvePath(path, from, aliases)
-  const files = await fg(`${maybePath.replace(/\\/g, '/')}*.+(ts|d.ts)`, { onlyFiles: true })
+  const files = await fg([
+    `${maybePath.replace(/\\/g, '/')}`,
+    `${maybePath.replace(/\\/g, '/')}*.+(ts|d.ts)`,
+    `${maybePath.replace(/\\/g, '/')}*/index.+(ts|d.ts)`,
+  ], { onlyFiles: true })
 
   if (files.length > 0)
     return files[0]

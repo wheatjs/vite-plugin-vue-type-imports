@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ButtonProps, ButtonEmits } from '~/button-types'
+import { Props } from '~/typings'
 
-defineProps<ButtonProps>()
-defineEmits<ButtonEmits>()
+defineProps<Props>()
+defineEmits<Props>()
 </script>
 
 <template>
@@ -12,7 +12,6 @@ defineEmits<ButtonEmits>()
     font-medium
     rounded
     m-8
-    :style="{ background: color }"
   >
     <slot />
   </button>
