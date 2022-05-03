@@ -4,6 +4,7 @@ import {
   ImportDeclaration,
   Node,
   Program,
+  StringLiteral,
   TSTypeLiteral,
   TSTypeParameterInstantiation,
   TSTypeAliasDeclaration,
@@ -35,6 +36,10 @@ export interface IImport {
   path: string
 }
 
+export type MaybeNode = Node | null | undefined;
+
+export type ExportNamedFromDeclaration = ExportNamedDeclaration & { source: StringLiteral };
+
 export function extractImportNodes(ast: Program) {
   return ast.body.filter((node): node is ImportDeclaration => node.type === 'ImportDeclaration')
 }
@@ -64,10 +69,15 @@ export function getAvailableImportsFromAst(ast: Program) {
   return imports
 }
 
+/**
+ * get reExported fields
+ *
+ * e.g. export { x } from './xxx'
+ */
 export function getAvailableExportsFromAst(ast: Program) {
   const exports: IImport[] = []
 
-  const addExport = (node: ExportNamedDeclaration) => {
+  const addExport = (node: ExportNamedFromDeclaration) => {
     for (const specifier of node.specifiers) {
       if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
         exports.push({
@@ -75,15 +85,16 @@ export function getAvailableExportsFromAst(ast: Program) {
           end: specifier.local.end!,
           imported: specifier.exported.name,
           local: specifier.local.name,
-          path: node.source!.value,
+          path: node.source.value,
         })
       }
     }
   }
 
   for (const node of ast.body) {
-    if (node.type === 'ExportNamedDeclaration')
-      addExport(node)
+    if (isExportNamedFromDeclaration(node)) {
+      addExport(node);
+    }
   }
 
   return exports
@@ -362,4 +373,8 @@ export function isCallOf(
       ? node.callee.name === test
       : test(node.callee.name))
   )
+}
+
+export function isExportNamedFromDeclaration(node: MaybeNode): node is ExportNamedFromDeclaration {
+  return !!(node && node.type === 'ExportNamedDeclaration' && node.source);
 }
