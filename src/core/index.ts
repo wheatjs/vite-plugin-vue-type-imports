@@ -3,7 +3,7 @@ import { AliasOptions, Alias } from 'vite'
 import { parse, babelParse } from '@vue/compiler-sfc'
 import { Identifier } from '@babel/types'
 import generate from '@babel/generator'
-import { getUsedInterfacesFromAst, getAvailableImportsFromAst, extractTypesFromSource, extractImportNodes } from './ast'
+import { getUsedInterfacesFromAst, getAvailableImportsFromAst, extractTypesFromSource } from './ast'
 import { resolveModulePath, replaceAtIndexes, Replacement, groupImports, intersect } from './utils'
 
 export interface TransformOptions {
@@ -19,7 +19,7 @@ export async function transform(code: string, options: TransformOptions) {
     return code
 
   const ast = babelParse(scriptSetup.content, { sourceType: 'module', plugins: ['typescript', 'topLevelAwait'] })
-  const imports = getAvailableImportsFromAst(ast.program)
+  const { imports, importNodes: fullImports } = getAvailableImportsFromAst(ast.program)
   const interfaces = getUsedInterfacesFromAst(ast.program)
 
   /**
@@ -48,7 +48,6 @@ export async function transform(code: string, options: TransformOptions) {
     .filter(x => x) as [string, string][]
 
   const replacements: Replacement[] = []
-  const fullImports = extractImportNodes(ast.program)
 
   // Clean up imports
   fullImports.forEach((i) => {

@@ -40,12 +40,9 @@ export type MaybeNode = Node | null | undefined;
 
 export type ExportNamedFromDeclaration = ExportNamedDeclaration & { source: StringLiteral };
 
-export function extractImportNodes(ast: Program) {
-  return ast.body.filter((node): node is ImportDeclaration => node.type === 'ImportDeclaration')
-}
-
 export function getAvailableImportsFromAst(ast: Program) {
-  const imports: IImport[] = []
+  const imports: IImport[] = [];
+  const importNodes: ImportDeclaration[] = [];
 
   const addImport = (node: ImportDeclaration) => {
     for (const specifier of node.specifiers) {
@@ -59,14 +56,17 @@ export function getAvailableImportsFromAst(ast: Program) {
         })
       }
     }
+
+    importNodes.push(node);
   }
 
   for (const node of ast.body) {
-    if (node.type === 'ImportDeclaration')
-      addImport(node)
+    if (node.type === 'ImportDeclaration' && node.specifiers.length) {
+        addImport(node)
+    }
   }
 
-  return imports
+  return { imports, importNodes };
 }
 
 /**
@@ -233,7 +233,7 @@ export async function extractTypesFromSource(source: string, types: string[], op
   const extractedTypes: [string, string][] = []
   const missingTypes: string[] = []
   const ast = (await babelParse(source, { sourceType: 'module', plugins: ['typescript', 'topLevelAwait'] })).program
-  const imports = [...getAvailableImportsFromAst(ast), ...getAvailableExportsFromAst(ast)]
+  const imports = [...getAvailableImportsFromAst(ast).imports, ...getAvailableExportsFromAst(ast)]
   const typescriptNodes = extractAllTypescriptTypesFromAST(ast)
 
   const extractFromPosition = (start: number | null, end: number | null) => start && end ? source.substring(start, end) : ''
