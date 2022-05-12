@@ -8,15 +8,16 @@
     "serve": "vite preview"
   },
   "devDependencies": {
-    "@iconify/json": "^1.1.426",
+    "@iconify/json": "^2.1.41",
     "@unocss/preset-attributify": "^0.7.5",
     "@unocss/preset-icons": "^0.7.5",
     "@unocss/preset-uno": "^0.7.5",
-    "@vitejs/plugin-vue": "^1.9.4",
+    "@vitejs/plugin-vue": "^2.3.3",
     "unocss": "^0.7.5",
-    "unplugin-auto-import": "^0.4.14",
-    "unplugin-vue-components": "^0.17.2",
+    "unplugin-auto-import": "^0.7.1",
+    "unplugin-vue-components": "^0.19.5",
     "vite": "^2.6.14",
+    "vite-plugin-inspect": "^0.5.0",
     "vite-plugin-vue-type-imports": "workspace:*"
   },
   "dependencies": {
