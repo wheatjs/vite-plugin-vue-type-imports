@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// import '~/auto-imports';
 import { Props } from '~/typings'
 
 defineProps<Props>()

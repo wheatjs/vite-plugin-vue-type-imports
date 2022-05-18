@@ -4,6 +4,7 @@ import {
   ImportDeclaration,
   Node,
   Program,
+  StringLiteral,
   TSTypeLiteral,
   TSTypeParameterInstantiation,
   TSTypeAliasDeclaration,
@@ -35,12 +36,13 @@ export interface IImport {
   path: string
 }
 
-export function extractImportNodes(ast: Program) {
-  return ast.body.filter((node): node is ImportDeclaration => node.type === 'ImportDeclaration')
-}
+export type MaybeNode = Node | null | undefined;
+
+export type ExportNamedFromDeclaration = ExportNamedDeclaration & { source: StringLiteral };
 
 export function getAvailableImportsFromAst(ast: Program) {
-  const imports: IImport[] = []
+  const imports: IImport[] = [];
+  const importNodes: ImportDeclaration[] = [];
 
   const addImport = (node: ImportDeclaration) => {
     for (const specifier of node.specifiers) {
@@ -54,20 +56,28 @@ export function getAvailableImportsFromAst(ast: Program) {
         })
       }
     }
+
+    importNodes.push(node);
   }
 
   for (const node of ast.body) {
-    if (node.type === 'ImportDeclaration')
-      addImport(node)
+    if (node.type === 'ImportDeclaration' && node.specifiers.length) {
+        addImport(node)
+    }
   }
 
-  return imports
+  return { imports, importNodes };
 }
 
+/**
+ * get reExported fields
+ *
+ * e.g. export { x } from './xxx'
+ */
 export function getAvailableExportsFromAst(ast: Program) {
   const exports: IImport[] = []
 
-  const addExport = (node: ExportNamedDeclaration) => {
+  const addExport = (node: ExportNamedFromDeclaration) => {
     for (const specifier of node.specifiers) {
       if (specifier.type === 'ExportSpecifier' && specifier.exported.type === 'Identifier') {
         exports.push({
@@ -75,15 +85,16 @@ export function getAvailableExportsFromAst(ast: Program) {
           end: specifier.local.end!,
           imported: specifier.exported.name,
           local: specifier.local.name,
-          path: node.source!.value,
+          path: node.source.value,
         })
       }
     }
   }
 
   for (const node of ast.body) {
-    if (node.type === 'ExportNamedDeclaration')
-      addExport(node)
+    if (isExportNamedFromDeclaration(node)) {
+      addExport(node);
+    }
   }
 
   return exports
@@ -222,7 +233,7 @@ export async function extractTypesFromSource(source: string, types: string[], op
   const extractedTypes: [string, string][] = []
   const missingTypes: string[] = []
   const ast = (await babelParse(source, { sourceType: 'module', plugins: ['typescript', 'topLevelAwait'] })).program
-  const imports = [...getAvailableImportsFromAst(ast), ...getAvailableExportsFromAst(ast)]
+  const imports = [...getAvailableImportsFromAst(ast).imports, ...getAvailableExportsFromAst(ast)]
   const typescriptNodes = extractAllTypescriptTypesFromAST(ast)
 
   const extractFromPosition = (start: number | null, end: number | null) => start && end ? source.substring(start, end) : ''
@@ -362,4 +373,8 @@ export function isCallOf(
       ? node.callee.name === test
       : test(node.callee.name))
   )
+}
+
+export function isExportNamedFromDeclaration(node: MaybeNode): node is ExportNamedFromDeclaration {
+  return !!(node && node.type === 'ExportNamedDeclaration' && node.source);
 }
