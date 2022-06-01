@@ -26,7 +26,7 @@ import VueTypeImports from 'vite-plugin-vue-type-imports'
 export default defineConfig({
   plugins: [
     Vue(), 
-    VueTypeImports(),
+    VueTypeImports({/* options */}),
   ],
 })
 ```
@@ -64,6 +64,36 @@ defineProps<User>()
 <template>...</template>
 ```
 
+## Options
+```typescript
+VueTypeImports({
+  // Non-practical function
+  // Just for those who want to get a nice output
+  clean: {
+    // Clean redundant newlines ("\n")
+    newline: false,
+    // Clean isolated interfaces which are replaced by a new interface created by the plugin
+    interface: false,
+  }
+})
+```
+
+## Known limitations
+- The following syntaxes are not supported currently:
+  - `import default`
+  - `import { a as b }`
+  - `export default`
+  - `export * from`
+- nested type parameters (e.g. `defineProps<Props<T>>()`) are not supported.
+- ~~At this stage, the plugin only scans the imported interfaces and does not process the interfaces defined in the SFC~~ Supported in the next release.
+- ~~HMR is not fully supported right now.~~ Fixed in the next release.
+- Interface which extends Literal Type or Intersection Type is not supported.
+- Types imported from external packages are not fully supported right now.
+- When interfaces implicitly rely on interfaces with the same name but different structures, the results may be different from what is expected.
+
+## Notes
+- `Enum` types will be converted to Union Types (e.g. `type [name] = number | string`) , since Vue can't handle them right now.
+- The plugin may be slow because it needs to traverse the AST (using @babel/parser).
 
 ## License
 
