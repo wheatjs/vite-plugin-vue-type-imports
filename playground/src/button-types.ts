@@ -1,10 +1,10 @@
-import { Color } from './other-types'
-export { ButtonProps } from './other-types'
+import { Color } from './other-types';
+export { ButtonProps } from './other-types';
 
 export interface InputProps {
-  name: Color
+  name: Color;
 }
 
 export interface ButtonEmits {
-  (e: 'click'): void
+  (e: 'click'): void;
 }

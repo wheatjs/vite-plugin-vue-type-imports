@@ -1,1 +1,1 @@
-export type MoreColors = 'green' | number
+export type MoreColors = 'green' | number;

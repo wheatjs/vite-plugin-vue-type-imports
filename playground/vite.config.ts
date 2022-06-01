@@ -1,11 +1,11 @@
-import path from 'path'
-import { defineConfig } from 'vite'
-import Vue from '@vitejs/plugin-vue'
-import Components from 'unplugin-vue-components/vite'
-import AutoImport from 'unplugin-auto-import/vite'
-import Unocss from 'unocss/vite'
-import { presetAttributify, presetIcons, presetUno } from 'unocss'
-import VueTypeImports from 'vite-plugin-vue-type-imports'
+import path from 'path';
+import { defineConfig } from 'vite';
+import Vue from '@vitejs/plugin-vue';
+import Components from 'unplugin-vue-components/vite';
+import AutoImport from 'unplugin-auto-import/vite';
+import Unocss from 'unocss/vite';
+import { presetAttributify, presetIcons, presetUno } from 'unocss';
+import VueTypeImports from 'vite-plugin-vue-type-imports';
 import Inspect from 'vite-plugin-inspect';
 
 export default defineConfig({
@@ -18,23 +18,16 @@ export default defineConfig({
     Vue(),
     VueTypeImports(),
     Unocss({
-      presets: [
-        presetUno(),
-        presetIcons(),
-        presetAttributify(),
-      ],
+      presets: [presetUno(), presetIcons(), presetAttributify()],
     }),
     Components({
       dirs: ['src/components'],
       dts: 'src/components.d.ts',
     }),
     AutoImport({
-      imports: [
-        'vue',
-        '@vueuse/core',
-      ],
+      imports: ['vue', '@vueuse/core'],
       dts: 'src/auto-imports.d.ts',
     }),
     Inspect(),
   ],
-})
+});
