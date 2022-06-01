@@ -1,7 +1,7 @@
 import { parse } from '@vue/compiler-sfc';
 import { Alias, AliasOptions } from 'vite';
 import { extractTypesFromSource, getUsedInterfacesFromAst } from './ast';
-import { getAst, replaceAtIndexes } from './utils';
+import { getAst, MaybeAliases, replaceAtIndexes } from './utils';
 
 export interface CleanOptions {
   newline?: boolean;
@@ -10,7 +10,7 @@ export interface CleanOptions {
 
 export interface TransformOptions {
   id: string;
-  aliases: ((AliasOptions | undefined) & Alias[]) | undefined;
+  aliases: MaybeAliases;
   clean: CleanOptions;
 }
 
