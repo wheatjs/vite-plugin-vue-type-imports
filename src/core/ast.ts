@@ -49,6 +49,8 @@ export interface InterfaceMetaData {
   isProperty?: boolean;
 }
 
+export type MaybeNumber = number | null | undefined;
+
 export type MaybeNode = Node | null | undefined;
 
 export type ExportNamedFromDeclaration = ExportNamedDeclaration & { source: StringLiteral };
@@ -274,7 +276,7 @@ export async function extractTypesFromSource(
   const extraSpecifiers: string[] = [];
   const extraReplacements: Replacement[] = [];
 
-  const extractFromPosition = (start: number | null, end: number | null) =>
+  const extractFromPosition = (start: MaybeNumber, end: MaybeNumber) =>
     isNumber(start) && isNumber(end) ? source.slice(start, end) : '';
 
   function removeInterface(node: TSInterfaceDeclaration) {
@@ -518,7 +520,7 @@ export async function extractTypesFromSource(
   };
 }
 
-export function isNumber(n: unknown): n is number {
+export function isNumber(n: MaybeNumber): n is number {
   return typeof n === 'number';
 }
 
