@@ -5,7 +5,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 export default defineConfig({
   minify: true,
   format: ['esm', 'cjs'],
-  entryPoints: ['./src/index.ts', './src/nuxt.ts'],
+  entry: ['./src/index.ts', './src/nuxt.ts'],
   target: 'node14',
   clean: true,
   external: ['fast-glob', '@babel/types', 'local-pkg'],
