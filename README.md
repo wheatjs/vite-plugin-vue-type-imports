@@ -90,6 +90,7 @@ VueTypeImports({
 - Interface which extends Literal Type or Intersection Type is not supported.
 - Types imported from external packages are not fully supported right now.
 - When interfaces implicitly rely on interfaces with the same name but different structures, the results may be different from what is expected.
+- The plugin currently only scans the content of `<script setup>`. Types defined in `<script>` will be ignored.
 
 ## Notes
 - `Enum` types will be converted to Union Types (e.g. `type [name] = number | string`) , since Vue can't handle them right now.
