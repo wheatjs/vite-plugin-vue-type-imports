@@ -1,3 +1,3 @@
-import VitePlugin from './vite'
+import VitePlugin from './vite';
 
-export default VitePlugin
+export default VitePlugin;

@@ -1,16 +1,18 @@
-import { Options } from 'tsup'
+import { defineConfig } from 'tsup';
 
-const config: Options = {
-  splitting: false,
+const isProduction = process.env.NODE_ENV === 'production';
+
+export default defineConfig({
+  minify: true,
   format: ['esm', 'cjs'],
-  entryPoints: [
-    'src/index.ts',
-    'src/vite.ts',
-    'src/nuxt.ts',
-  ],
+  entry: ['./src/index.ts', './src/nuxt.ts'],
   target: 'node14',
   clean: true,
-  dts: true,
-}
-
-export default config
+  external: ['fast-glob', '@babel/types', 'local-pkg'],
+  dts: isProduction,
+  esbuildOptions(options) {
+    if (isProduction) {
+      options.pure = ['console.log'];
+    }
+  },
+});
