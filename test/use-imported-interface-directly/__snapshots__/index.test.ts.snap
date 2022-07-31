@@ -1,0 +1,52 @@
+// Vitest Snapshot v1
+
+exports[`Interface extends interface (No references) 1`] = `
+"
+    <script lang=\\"ts\\" setup>
+interface Props {
+    baz: boolean;
+
+    foo: string;
+    bar: number;
+}
+
+    
+    
+    defineProps<Props>()
+    
+</script>
+    "
+`;
+
+exports[`Interface which has no references 1`] = `
+"
+    <script lang=\\"ts\\" setup>
+interface Props {
+    foo: string;
+    bar: number;
+}
+
+    
+    
+    defineProps<Props>()
+    
+</script>
+    "
+`;
+
+exports[`Redeclaration of types #6 1`] = `
+"
+    <script lang=\\"ts\\" setup>
+type Foo = [number, number]
+interface Props {
+    foo: Foo
+    bar: Foo
+}
+
+    
+    
+    defineProps<Props>()
+    
+</script>
+    "
+`;
