@@ -24,12 +24,14 @@ const presets: Record<string, TransformOptions> = {
     'clean all': { id: __filename, clean: { newline: true, interface: true } }
 };
 
+const excludeFilesAndDirs = ['index.test.ts', '__snapshots__']
+
 // pattern: "// Description (Extra description)"
 const singleLineCommentRE = /^\/\/\s([^\(\)]+)(\((.+)\))?/g
 
 const directories = new Set(await readdir(__dirname));
 
-directories.delete('index.test.ts')
+excludeFilesAndDirs.forEach(val => directories.delete(val));
 
 // NOTE: Relative paths
 const resolvedDirs = [...directories];
