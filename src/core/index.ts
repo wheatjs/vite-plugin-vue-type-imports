@@ -10,8 +10,8 @@ export interface CleanOptions {
 
 export interface TransformOptions {
   id: string;
-  aliases: MaybeAliases;
   clean: CleanOptions;
+  aliases?: MaybeAliases;
 }
 
 export async function transform(code: string, { id, aliases, clean }: TransformOptions) {
