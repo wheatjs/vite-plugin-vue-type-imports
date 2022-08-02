@@ -10,13 +10,11 @@
     "resolveJsonModule": true,
     "skipDefaultLibCheck": true,
     "types": ["vitest/globals"],
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "~/*": ["./src/*"]
-    }
+    "forceConsistentCasingInFileNames": true
   },
   "exclude": [
     "**/dist/**",
-    "**/node_modules/**"
+    "**/node_modules/**",
+    "**/coverage/**"
   ]
 }
