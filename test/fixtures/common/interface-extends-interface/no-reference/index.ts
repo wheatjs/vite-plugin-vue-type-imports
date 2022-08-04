@@ -1,4 +1,3 @@
-// Interface extends interface (No references)
 export interface BaseProps {
     baz: boolean;
 }
