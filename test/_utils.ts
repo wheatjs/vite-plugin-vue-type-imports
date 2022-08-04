@@ -59,15 +59,15 @@ export interface DefineTransformTestOptions {
     structureRE?: RegExp
 }
 
-export async function defineTransformTest(options: DefineTransformTestOptions) {
+export function defineTransformTest(options: DefineTransformTestOptions) {
     const { category, codeGetter, filePattern, fileName, structureRE } = options;
 
-    // NOTE: Relative paths
-    const files = await fg(filePattern, { cwd: dirname(fileName) })
+    describe(category, async () => {
+        // NOTE: Relative paths
+        const files = await fg(filePattern, { cwd: dirname(fileName) })
 
-    const directoryStructure = generateDirectoryStructure(files, structureRE);
+        const directoryStructure = generateDirectoryStructure(files, structureRE);
 
-    describe(category, () => {
         // Scenario
         describe.each(Object.keys(directoryStructure))('%s', scenario => {
 

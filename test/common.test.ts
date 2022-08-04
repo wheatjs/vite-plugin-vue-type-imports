@@ -7,7 +7,7 @@ defineProps<Props>()
 </script>
 `
 
-await defineTransformTest({
+defineTransformTest({
     category: 'Common',
     filePattern: ['./fixtures/common/**/!(_)*.ts'],
     fileName: __filename,

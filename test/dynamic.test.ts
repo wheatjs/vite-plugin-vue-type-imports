@@ -6,7 +6,7 @@ const codeGetter: CodeGetter = async ({ entry }) => readFile(resolve(__dirname, 
 
 const structureRE = /.+\/dynamic\/(.+)\/(.+)\//g
 
-await defineTransformTest({
+defineTransformTest({
     category: 'Dynamic',
     filePattern: ['./fixtures/dynamic/**/*.vue'],
     fileName: __filename,
