@@ -1,34 +1,36 @@
-import { Plugin, ResolvedConfig } from 'vite';
-import { CleanOptions, transform } from './core';
+import type { Plugin, ResolvedConfig } from 'vite'
+import type { CleanOptions } from './core'
+import { transform } from './core'
 
 interface PluginOptions {
-  clean?: CleanOptions;
+  clean?: CleanOptions
 }
 
 export default function VitePluginVueTypeImports(options: PluginOptions = {}): Plugin {
-  const clean = options.clean ?? {};
-  let resolvedConfig: ResolvedConfig | undefined;
+  const clean = options.clean ?? {}
+  let resolvedConfig: ResolvedConfig | undefined
 
   return {
     name: 'vite-plugin-vue-type-imports',
     enforce: 'pre',
     async configResolved(config) {
-      resolvedConfig = config;
+      resolvedConfig = config
     },
     async transform(code, id) {
-      if (!/\.(vue)$/.test(id)) return;
+      if (!/\.(vue)$/.test(id))
+        return
 
-      const aliases = resolvedConfig?.resolve.alias;
+      const aliases = resolvedConfig?.resolve.alias
 
       const transformedCode = await transform(code, {
         id,
         aliases,
         clean,
-      });
+      })
 
       return {
         code: transformedCode,
-      };
+      }
     },
-  };
+  }
 }

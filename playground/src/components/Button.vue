@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // import '~/auto-imports';
-import { Props } from '~/typings'
+import type { Props } from '~/typings'
 
 defineProps<Props>()
 defineEmits<Props>()
