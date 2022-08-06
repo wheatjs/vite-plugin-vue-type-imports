@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
-defineProps<Props>();
+defineProps<Props>()
 </script>

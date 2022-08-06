@@ -1,8 +1,8 @@
 export interface BaseProps {
-    baz: boolean;
+  baz: boolean
 }
 
 export interface Props extends BaseProps {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
