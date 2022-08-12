@@ -3,10 +3,10 @@
 exports[`Common > Interface extends interface > No reference > index.ts (clean all) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    baz: boolean;
+  baz: boolean
 
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 defineProps<Props>()
 </script>
@@ -16,10 +16,10 @@ defineProps<Props>()
 exports[`Common > Interface extends interface > No reference > index.ts (clean interface) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    baz: boolean;
+  baz: boolean
 
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
 
@@ -33,10 +33,10 @@ defineProps<Props>()
 exports[`Common > Interface extends interface > No reference > index.ts (clean newline) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    baz: boolean;
+  baz: boolean
 
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 defineProps<Props>()
 </script>
@@ -46,10 +46,10 @@ defineProps<Props>()
 exports[`Common > Interface extends interface > No reference > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    baz: boolean;
+  baz: boolean
 
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
 
@@ -63,8 +63,8 @@ defineProps<Props>()
 exports[`Common > Interface without reference > Default > index.ts (clean all) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 defineProps<Props>()
 </script>
@@ -74,8 +74,8 @@ defineProps<Props>()
 exports[`Common > Interface without reference > Default > index.ts (clean interface) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
 
@@ -89,8 +89,8 @@ defineProps<Props>()
 exports[`Common > Interface without reference > Default > index.ts (clean newline) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 defineProps<Props>()
 </script>
@@ -100,8 +100,8 @@ defineProps<Props>()
 exports[`Common > Interface without reference > Default > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
 
@@ -116,8 +116,8 @@ exports[`Common > Redeclaration of types > Default > index.ts (clean all) 1`] = 
 "<script lang=\\"ts\\" setup>
 type Foo = [number, number]
 interface Props {
-    foo: Foo
-    bar: Foo
+  foo: Foo
+  bar: Foo
 }
 defineProps<Props>()
 </script>
@@ -128,8 +128,8 @@ exports[`Common > Redeclaration of types > Default > index.ts (clean interface) 
 "<script lang=\\"ts\\" setup>
 type Foo = [number, number]
 interface Props {
-    foo: Foo
-    bar: Foo
+  foo: Foo
+  bar: Foo
 }
 
 
@@ -144,8 +144,8 @@ exports[`Common > Redeclaration of types > Default > index.ts (clean newline) 1`
 "<script lang=\\"ts\\" setup>
 type Foo = [number, number]
 interface Props {
-    foo: Foo
-    bar: Foo
+  foo: Foo
+  bar: Foo
 }
 defineProps<Props>()
 </script>
@@ -156,8 +156,8 @@ exports[`Common > Redeclaration of types > Default > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 type Foo = [number, number]
 interface Props {
-    foo: Foo
-    bar: Foo
+  foo: Foo
+  bar: Foo
 }
 
 

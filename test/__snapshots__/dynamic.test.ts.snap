@@ -1,45 +1,182 @@
 // Vitest Snapshot v1
 
+exports[`Dynamic > Interface extends interface > No reference > index.vue (clean all) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > index.vue (clean interface) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+
+
+
+
+
+defineProps<Props>()
+
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > index.vue (clean newline) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > index.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+
+
+
+
+
+defineProps<Props>()
+
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > internal.vue (clean all) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > internal.vue (clean interface) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+
+
+
+
+
+defineProps<Props>()
+
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > internal.vue (clean newline) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+interface BaseProps {
+  baz: boolean
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Interface extends interface > No reference > internal.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface Props {
+  baz: boolean
+
+  foo: string
+  bar: number
+}
+
+interface BaseProps {
+  baz: boolean
+}
+
+
+
+defineProps<Props>()
+
+</script>
+"
+`;
+
 exports[`Dynamic > Interface without reference > No transform > index.vue (clean all) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
-defineProps<Props>();
-</script>"
+defineProps<Props>()
+</script>
+"
 `;
 
 exports[`Dynamic > Interface without reference > No transform > index.vue (clean interface) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
-defineProps<Props>();
-</script>"
+defineProps<Props>()
+</script>
+"
 `;
 
 exports[`Dynamic > Interface without reference > No transform > index.vue (clean newline) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
-defineProps<Props>();
-</script>"
+defineProps<Props>()
+</script>
+"
 `;
 
 exports[`Dynamic > Interface without reference > No transform > index.vue (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
-    foo: string;
-    bar: number;
+  foo: string
+  bar: number
 }
 
-defineProps<Props>();
-</script>"
+defineProps<Props>()
+</script>
+"
 `;
