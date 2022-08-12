@@ -1,4 +1,4 @@
-import { basename, dirname } from 'path'
+import { basename, dirname, resolve } from 'path'
 import fg from 'fast-glob'
 import type { Awaitable } from 'vitest'
 import type { TransformOptions } from '../src/core'
@@ -53,14 +53,16 @@ export interface DefineTransformTestOptions {
   filePattern: string | string[]
   fileName: string
   structureRE?: RegExp
+  realPath?: boolean
 }
 
 export function defineTransformTest(options: DefineTransformTestOptions) {
-  const { category, codeGetter, filePattern, fileName, structureRE } = options
+  const { category, codeGetter, filePattern, fileName, structureRE, realPath } = options
 
   describe(category, async () => {
+    const dir = dirname(fileName)
     // NOTE: Relative paths
-    const files = await fg(filePattern, { cwd: dirname(fileName) })
+    const files = await fg(filePattern, { cwd: dir, onlyFiles: true })
 
     const directoryStructure = generateDirectoryStructure(files, structureRE)
 
@@ -73,7 +75,7 @@ export function defineTransformTest(options: DefineTransformTestOptions) {
         const tests: TestMetaData[] = []
 
         entries.forEach((entry) => {
-          Object.entries(generatePresets(fileName)).forEach(([presetName, options]) => {
+          Object.entries(generatePresets(realPath ? resolve(dir, entry) : fileName)).forEach(([presetName, options]) => {
             tests.push({
               entry,
               entryName: basename(entry),
@@ -86,7 +88,6 @@ export function defineTransformTest(options: DefineTransformTestOptions) {
         // Entry files
         test.each(tests)('$entryName ($presetName)', async (metaData) => {
           const code = await codeGetter(metaData)
-          // Mock fake file and fake path to transform
           const result = await transform(code, metaData.options)
 
           expect(result).toMatchSnapshot()

@@ -13,4 +13,5 @@ defineTransformTest({
   fileName: __filename,
   codeGetter,
   structureRE,
+  realPath: true,
 })
