@@ -26,41 +26,40 @@
     "dev": "cross-env NODE_ENV=development tsup --watch src",
     "prepublishOnly": "nr build",
     "lint": "eslint \"**/*.{ts,vue,mjs}\"",
-    "lint:fix": "nr lint -- --fix",
+    "lint:fix": "nr lint --fix",
     "play": "npm -C playground run dev",
     "play:build": "pnpm run build && npm -C playground run build",
     "release": "git-ensure --no-behind -b main --clean && bumpp --commit --tag --push",
-    "test": "jest",
-    "test:update": "jest -u"
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [],
   "devDependencies": {
-    "@antfu/eslint-config": "^0.11.1",
-    "@antfu/ni": "^0.11.0",
-    "@types/jest": "^27.0.3",
-    "@types/node": "^16.11.11",
-    "@vue/compiler-sfc": "^3.2.24",
-    "bumpp": "^7.1.1",
+    "@antfu/eslint-config": "^0.25.2",
+    "@antfu/ni": "^0.17.2",
+    "@types/node": "^18.6.3",
+    "@vitest/ui": "^0.20.3",
+    "@vue/compiler-sfc": "^3.2.37",
+    "bumpp": "^8.2.1",
+    "c8": "^7.12.0",
     "cross-env": "^7.0.3",
-    "eslint": "^8.3.0",
-    "eslint-plugin-jest": "^25.3.0",
-    "esno": "^0.12.1",
+    "eslint": "^8.21.0",
+    "esno": "^0.16.3",
     "git-ensure": "^0.1.0",
-    "jest": "^27.4.3",
-    "prettier": "^2.6.2",
-    "ts-jest": "^27.0.7",
-    "tsup": "6.0.1",
-    "typescript": "^4.5.2",
-    "vite": "^2.6.14",
-    "vue": "^3.2.24"
+    "tsup": "6.2.1",
+    "typescript": "^4.7.4",
+    "vite": "^3.0.4",
+    "vitest": "^0.20.3",
+    "vue": "^3.2.37"
   },
   "peerDependencies": {
     "@vue/compiler-sfc": "^3.2.24",
     "vue": "^3.2.24"
   },
   "dependencies": {
-    "@babel/types": "^7.18.4",
+    "@babel/types": "^7.18.10",
     "fast-glob": "^3.2.11",
-    "local-pkg": "^0.4.1"
+    "local-pkg": "^0.4.2"
   }
 }

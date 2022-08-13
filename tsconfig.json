@@ -8,10 +8,13 @@
     "strict": true,
     "strictNullChecks": true,
     "resolveJsonModule": true,
-    "skipDefaultLibCheck": true
+    "skipDefaultLibCheck": true,
+    "types": ["vitest/globals"],
+    "forceConsistentCasingInFileNames": true
   },
   "exclude": [
     "**/dist/**",
-    "**/node_modules/**"
+    "**/node_modules/**",
+    "**/coverage/**"
   ]
 }
