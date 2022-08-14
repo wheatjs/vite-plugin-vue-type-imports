@@ -68,7 +68,7 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
    * External package
    * If the path is just a single dot, append '/index' to prevent incorrect results
    */
-  const resolved_path = resolveModule(path === '.' ? `${path}/index` : path)
+  const resolved_path = resolveModule(path === '.' ? './index' : path)
 
   // Not a package. e.g. '../types'
   if (!resolved_path)
