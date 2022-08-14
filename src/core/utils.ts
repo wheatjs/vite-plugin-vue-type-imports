@@ -64,8 +64,11 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
   if (matchedEntry)
     return path.replace(matchedEntry.find, matchedEntry.replacement)
 
-  // External package
-  const resolved_path = resolveModule(path)
+  /**
+   * External package
+   * If the path is just a single dot, append '/index' to prevent incorrect results
+   */
+  const resolved_path = resolveModule(path === '.' ? `${path}/index` : path)
 
   // Not a package. e.g. '../types'
   if (!resolved_path)
