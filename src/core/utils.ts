@@ -1,17 +1,62 @@
 import { existsSync, readFileSync } from 'fs'
-import { dirname, extname, join } from 'path'
+import { dirname, join } from 'path'
+import colors from 'picocolors'
+import _debug from 'debug'
 import fg from 'fast-glob'
 import { resolveModule } from 'local-pkg'
 import type { Alias, AliasOptions } from 'vite'
-import { babelParse } from '@vue/compiler-sfc'
-import type { Program } from '@babel/types'
-import type { IImport } from './ast'
+import { babelParse, generateCodeFrame } from '@vue/compiler-sfc'
+import type { CallExpression, Node, Program, TSEnumDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration } from '@babel/types'
+import type { ExtractedTypes, IExport, IImport } from './ast'
+import { DEFINE_EMITS, DEFINE_PROPS, LogMsg, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
 
 type Pkg = Partial<Record<'types' | 'typings', string>>
 
-export type StringMap = Map<string, string>
+/**
+ * Type name prefixed with path
+ *
+ * @example '/foo/bar/baz.ts:Props'
+ */
+export type NameWithPath = string
+
+/**
+ * The actual name of type. It may be prefixed by the plugin.
+ *
+ * @example
+ * ```text
+ * 1. 'Foo'
+ * 2. '_VTI_TYPE_Foo'
+ * 3. '_VTI_TYPE_Foo_2'
+ * ```
+ */
+export type FullName = string
+
+export type TSTypes = TSTypeAliasDeclaration | TSInterfaceDeclaration | TSEnumDeclaration
 
 export type MaybeAliases = ((AliasOptions | undefined) & Alias[]) | undefined
+
+export type MaybeString = string | null | undefined
+
+export type MaybeNumber = number | null | undefined
+
+export type MaybeNode = Node | null | undefined
+
+export function debuggerFactory(namespace: string) {
+  return (name?: string) => {
+    const _debugger = _debug(`${PLUGIN_NAME}:${namespace}${name ? `:${name}` : ''}`)
+
+    /**
+     * NOTE(zorin): Use `console.log` instead when testing.
+     * Because the output of the default logger is incomplete (i.e. it will lost some debug messages) when testing.
+     */
+    if (import.meta.vitest)
+      _debugger.log = console.log.bind(console)
+
+    return _debugger
+  }
+}
+
+const createUtilsDebugger = debuggerFactory('Utils')
 
 export function getAst(content: string): Program {
   return babelParse(content, {
@@ -68,20 +113,21 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
    * External package
    * If the path is just a single dot, append '/index' to prevent incorrect results
    */
-  const resolved_path = resolveModule(path === '.' ? './index' : path)
+  const modulePath = resolveModule(path === '.' ? './index' : path)
+  const dtsRE = /.+\.d\.ts$/
 
   // Not a package. e.g. '../types'
-  if (!resolved_path)
+  if (!modulePath)
     return join(dirname(from), path)
 
-  // Result is a typescript file. e.g. 'vue/macros-global.d.ts'
-  if (extname(resolved_path) === '.ts') {
-    return resolved_path
+  // Result is a typescript declaration file. e.g. 'vue/macros-global.d.ts'
+  if (dtsRE.test(modulePath)) {
+    return modulePath
   }
   // Not a typescript file, find declaration file
-  // The only situation is that the types are imported from the main entry. e.g. 'vue' -> 'vue/dist/vue.d.ts'
+  // TODO(zorin): Still needs to be improved
   else {
-    const packageJsonPath = searchPackageJSON(resolved_path)
+    const packageJsonPath = searchPackageJSON(modulePath)
 
     if (!packageJsonPath)
       return
@@ -100,15 +146,30 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
   }
 }
 
-export async function resolveModulePath(path: string, from: string, aliases: MaybeAliases) {
+export async function resolveModulePath(path: string, from: string, aliases?: MaybeAliases) {
+  const debug = createUtilsDebugger('resolveModulePath')
+
   const maybePath = resolvePath(path, from, aliases)?.replace(/\\/g, '/')
+
+  debug('Resolved path: %s', maybePath)
 
   if (!maybePath)
     return null
 
-  const files = await fg([`${maybePath}`, `${maybePath}*.+(ts|d.ts)`, `${maybePath}*/index.+(ts|d.ts)`], {
+  let files = await fg([`${maybePath}`, `${maybePath}?(.d).ts`], {
     onlyFiles: true,
   })
+
+  if (!files.length) {
+    /**
+     * NOTE(zorin): We only scan index(.d).ts when the result is empty, otherwise it may cause 'ENOTDIR' error
+     */
+    files = await fg([`${maybePath}/index?(.d).ts`], {
+      onlyFiles: true,
+    })
+  }
+
+  debug('Matched files: %O', files)
 
   if (files.length)
     return files[0]
@@ -116,16 +177,106 @@ export async function resolveModulePath(path: string, from: string, aliases: May
   return null
 }
 
-/**
- * @returns Record<string, string[]> - key: the imported file, value: imported fields
- */
-export function groupImports(imports: IImport[]) {
-  return imports.reduce<Record<string, string[]>>((obj, importInfo) => {
-    obj[importInfo.path] = obj[importInfo.path] || []
-    obj[importInfo.path].push(importInfo.imported)
+export type LocationMap = Record<string, Pick<IImport, 'start' | 'end'>>
 
-    return obj
+export interface ImportInfo {
+  aliases: Record<string, string>
+  locationMap: LocationMap
+  localSpecifiers: string[]
+}
+
+export type GroupedImports = Record<string, ImportInfo>
+
+/**
+ * Categorize imports
+ *
+ * @example
+ * ```
+ * const code = `import { a as bb, b as cc, c as aa } from 'example'`
+ * // ...(Operations of getting AST and imports)
+ * const groupedImports = groupImports(imports);
+ *
+ * console.log(groupedImports)
+ * // Result:
+ * {
+ *   example: {
+ *     aliases: {
+ *       bb: 'a',
+ *       cc: 'b',
+ *       aa: 'c'
+ *     },
+ *     locationMap: {...},
+ *     localSpecifiers: ['bb', 'cc', 'aa']
+ *   }
+ * }
+ * ```
+ */
+export function groupImports(imports: IImport[], source: string, fileName: string) {
+  const importedSpecifiers: string[] = []
+
+  return imports.reduce<GroupedImports>((res, rawImport) => {
+    res[rawImport.path] ||= {
+      aliases: {},
+      locationMap: {},
+      localSpecifiers: [],
+    }
+
+    if (importedSpecifiers.includes(rawImport.imported)) {
+      warn(`Duplicate imports of type "${rawImport.imported}" found. ${LogMsg.UNEXPECTED_RESULT}`, {
+        fileName,
+        codeFrame: generateCodeFrame(source, rawImport.start, rawImport.end),
+      })
+    }
+
+    const importInfo = res[rawImport.path]
+    importInfo.localSpecifiers.push(rawImport.local)
+    importInfo.locationMap[rawImport.local] = {
+      start: rawImport.start,
+      end: rawImport.end,
+    }
+
+    importedSpecifiers.push(rawImport.imported)
+
+    if (rawImport.local !== rawImport.imported)
+      importInfo.aliases[rawImport.local] = rawImport.imported
+
+    return res
   }, {})
+}
+
+export function convertExportsToImports(exports: IExport[], groupedImports: GroupedImports): IImport[] {
+  const debug = createUtilsDebugger('convertExportsToImports')
+
+  // localSpecifier -> modulePath
+  const specifiersMap = Object.entries(groupedImports).reduce<Record<string, string>>((res, [modulePath, importInfo]) => {
+    importInfo.localSpecifiers.forEach((s) => {
+      res[s] = modulePath
+    })
+
+    return res
+  }, {})
+
+  debug('Specifiers map: %O', specifiersMap)
+
+  return exports.map(({ start, end, local, exported, path }) => {
+    if (path || specifiersMap[local]) {
+      const mappedPath = specifiersMap[local]
+      let imported = local
+
+      if (!path && isString(mappedPath))
+        imported = groupedImports[mappedPath].aliases[local] || local
+
+      return {
+        start,
+        end,
+        local: exported,
+        imported,
+        path: path || mappedPath,
+      }
+    }
+
+    return null
+  }).filter(notNullish)
 }
 
 export function intersect<A = any, B = any>(a: Array<A>, b: Array<B>): (A | B)[] {
@@ -142,25 +293,170 @@ export interface Replacement {
 
 /**
  * Replace all items at specified indexes from the bottom up.
+ *
+ * NOTE(zorin): We assume that each replacement selection does not overlap with each other
  */
-export function replaceAtIndexes(source: string, replacements: Replacement[], clean = false): string {
+export function replaceAtIndexes(source: string, replacements: Replacement[], offset = 0): string {
   replacements.sort((a, b) => b.start - a.start)
   let result = source
 
   for (const node of replacements)
-    result = result.slice(0, node.start) + node.replacement + result.slice(node.end)
+    result = result.slice(0, node.start + offset) + node.replacement + result.slice(node.end + offset)
 
-  // remove empty newline -> ''
-  if (clean) {
-    result = result
-      .split('\n')
-      .filter(val => val)
-      .join('\n')
+  return result.split(/\r?\n/).filter(Boolean).join('\n')
+}
+
+/**
+ * Collect dependencies and flatten it by using BFS
+ *
+ * NOTE(zorin): Maybe this needs a better solution.
+ *
+ * @example
+ * Source code:
+ * ```
+ * type Foo = string;
+ * type Bar = Foo;
+ *
+ * export interface Props {
+ *   foo: Foo;
+ *   bar: Bar;
+ * }
+ * ```
+ * Dependency graph:
+ * ```
+ * Props ---Foo
+ *       |--Bar--Foo
+ * ```
+ * Result: ['Foo', 'Bar', 'Props']
+ */
+export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<FullName, NameWithPath>, dependencies: string[]): string[] {
+  function _resolveDependencies() {
+    const queue: string[] = dependencies
+    const result: string[] = []
+
+    while (queue.length) {
+      const shift = queue.shift()!
+
+      const key = namesMap[shift]
+
+      /**
+       * Skip adding dependency
+       *
+       * NOTE(zorin): The only situation I know is invalid type (Types that are not even found after the recursion completes)
+       */
+      if (!key) {
+        warn(`Invalid type found: ${shift}`)
+        continue
+      }
+
+      result.push(key)
+
+      const dependencies = extracted.get(key)!.dependencies
+
+      if (dependencies?.length)
+        dependencies.forEach(dep => queue.push(dep))
+    }
+
+    return result
   }
+
+  // Dedupe from the end
+  return [...new Set(_resolveDependencies().reverse())]
+}
+
+/**
+ * Generate correct order of extension by using BFS. Similar to `resolveDependencies`
+ *
+ * NOTE(zorin): Maybe this needs a better solution.
+ */
+export function resolveExtends(record: Record<string, string[]>) {
+  function _resolveExtends() {
+    const queue: string[] = Object.keys(record)
+    const result: string[] = []
+
+    while (queue.length) {
+      const shift = queue.shift()!
+
+      result.push(shift)
+
+      const extendTypes = record[shift]
+
+      if (extendTypes?.length)
+        extendTypes.forEach(key => queue.push(key))
+    }
+
+    return result
+  }
+
+  // Dedupe from the end
+  const result = [...new Set(_resolveExtends().reverse())]
 
   return result
 }
 
-export function insertString(source: string, start: number, insertVal: string): string {
-  return source.slice(0, start) + insertVal + source.slice(start)
+export function isNumber(n: MaybeNumber): n is number {
+  return typeof n === 'number'
 }
+
+export function isString(n: MaybeString): n is string {
+  return typeof n === 'string'
+}
+
+export function isCallOf(node: MaybeNode, test: string | ((id: string) => boolean)): node is CallExpression {
+  return !!(
+    node
+    && node.type === 'CallExpression'
+    && node.callee.type === 'Identifier'
+    && (typeof test === 'string' ? node.callee.name === test : test(node.callee.name))
+  )
+}
+
+export function isTSTypes(node: MaybeNode): node is TSTypes {
+  return !!(node && TS_TYPES_KEYS.includes(node.type))
+}
+
+export function notNullish<T>(val: T | null | undefined): val is NonNullable<T> {
+  return val != null
+}
+
+export interface LogOptions {
+  fileName?: string
+  codeFrame?: string
+}
+
+export function mergeLogMsg(options: LogOptions & { msg: string }) {
+  const { msg, fileName, codeFrame } = options
+
+  const result = [
+    msg,
+    '',
+    fileName,
+    codeFrame,
+  ].filter(notNullish)
+
+  // Push newline if the last line is not an empty string
+  if (result.at(-1))
+    result.push('')
+
+  return result.join('\n')
+}
+
+export function warn(msg: string, { fileName, codeFrame }: LogOptions = {}) {
+  const result = mergeLogMsg({ msg, fileName, codeFrame })
+
+  console.warn(colors.yellow(`[${PLUGIN_NAME}] WARN: ${result}`))
+}
+
+export function error(msg: string, { fileName, codeFrame }: LogOptions = {}): never {
+  const result = mergeLogMsg({ msg, fileName, codeFrame })
+
+  throw new Error(colors.red(`[${PLUGIN_NAME}] ERROR: ${result}`))
+}
+
+export function isEnum(node: TSTypes | null | undefined): node is TSEnumDeclaration {
+  return !!(node && node.type === 'TSEnumDeclaration')
+}
+
+export const isDefineProps = (node: Node): node is CallExpression => isCallOf(node, DEFINE_PROPS)
+export const isDefineEmits = (node: Node): node is CallExpression => isCallOf(node, DEFINE_EMITS)
+export const isWithDefaults = (node: Node): node is CallExpression => isCallOf(node, WITH_DEFAULTS)

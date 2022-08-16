@@ -14,4 +14,5 @@ defineTransformTest({
   codeGetter,
   structureRE,
   realPath: true,
+  skip: false,
 })

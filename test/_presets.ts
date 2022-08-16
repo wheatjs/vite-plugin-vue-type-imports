@@ -1,12 +1,13 @@
 import type { TransformOptions } from '../src/core'
 
-export type Presets = Record<string, TransformOptions>
+export const presetNames = ['default'] as const
+
+export type PresetNames = typeof presetNames[number]
+
+export type Presets = Record<PresetNames, TransformOptions>
 
 export function generatePresets(id: string): Presets {
   return {
-    'default': { id, clean: {} },
-    'clean newline': { id, clean: { newline: true } },
-    'clean interface': { id, clean: { interface: true } },
-    'clean all': { id, clean: { newline: true, interface: true } },
+    default: { id },
   }
 }

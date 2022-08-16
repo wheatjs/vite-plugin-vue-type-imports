@@ -5,6 +5,9 @@ import type { TransformOptions } from '../src/core'
 import { transform } from '../src/core'
 import { generatePresets } from './_presets'
 
+/**
+ * Replace hyphen to space, and uppercase the first character
+ */
 export function normalizeName(val: string): string {
   const result = val.replace(/-/g, ' ')
   return result[0].toUpperCase() + result.slice(1)
@@ -20,7 +23,7 @@ export interface TestMetaData {
 export type DirectoryStructure = Record<string, Record<string, string[]>>
 
 export function generateDirectoryStructure(files: string[], re?: RegExp): DirectoryStructure {
-  const structureRE = re ?? /.+\/common\/(.+)\/(.+)\//g
+  const structureRE = re || /.+\/common\/(.+)\/(.+)\//g
   const result: DirectoryStructure = {}
 
   files.forEach((file) => {
@@ -37,8 +40,8 @@ export function generateDirectoryStructure(files: string[], re?: RegExp): Direct
     if (!(scenario || detailedScenario))
       throw new Error('Error while parsing directory structure.')
 
-    result[scenario] ??= {}
-    result[scenario][detailedScenario] ??= []
+    result[scenario] ||= {}
+    result[scenario][detailedScenario] ||= []
     result[scenario][detailedScenario].push(file)
   })
 
@@ -54,15 +57,21 @@ export interface DefineTransformTestOptions {
   fileName: string
   structureRE?: RegExp
   realPath?: boolean
+  skip?: boolean
 }
 
 export function defineTransformTest(options: DefineTransformTestOptions) {
-  const { category, codeGetter, filePattern, fileName, structureRE, realPath } = options
+  const { category, codeGetter, filePattern, fileName, structureRE, realPath, skip } = options
+
+  if (skip) {
+    describe.skip(category)
+    return
+  }
 
   describe(category, async () => {
     const dir = dirname(fileName)
-    // NOTE: Relative paths
-    const files = await fg(filePattern, { cwd: dir, onlyFiles: true })
+    // NOTE(zorin): Relative paths
+    const files = await fg(filePattern, { cwd: dir, onlyFiles: true, deep: 3 })
 
     const directoryStructure = generateDirectoryStructure(files, structureRE)
 
