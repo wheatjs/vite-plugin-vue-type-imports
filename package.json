@@ -31,7 +31,9 @@
     "play:build": "pnpm run build && npm -C playground run build",
     "release": "git-ensure --no-behind -b main --clean && bumpp --commit --tag --push",
     "test": "vitest",
+    "test:ci": "cross-env CI=true vitest",
     "test:ui": "vitest --ui",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "coverage": "vitest run --coverage"
   },
   "keywords": [],
