@@ -38,30 +38,33 @@
   },
   "keywords": [],
   "devDependencies": {
-    "@antfu/eslint-config": "^0.25.2",
+    "@antfu/eslint-config": "^0.26.2",
     "@antfu/ni": "^0.17.2",
-    "@types/node": "^18.6.3",
-    "@vitest/ui": "^0.20.3",
-    "@vue/compiler-sfc": "^3.2.37",
+    "@types/debug": "^4.1.7",
+    "@types/node": "^18.7.14",
+    "@vitest/coverage-c8": "^0.22.1",
+    "@vitest/ui": "^0.22.1",
+    "@vue/compiler-sfc": "^3.2.38",
     "bumpp": "^8.2.1",
-    "c8": "^7.12.0",
     "cross-env": "^7.0.3",
-    "eslint": "^8.21.0",
+    "eslint": "^8.23.0",
     "esno": "^0.16.3",
     "git-ensure": "^0.1.0",
-    "tsup": "6.2.1",
-    "typescript": "^4.7.4",
-    "vite": "^3.0.4",
-    "vitest": "^0.20.3",
-    "vue": "^3.2.37"
+    "tsup": "6.2.3",
+    "typescript": "^4.8.2",
+    "vite": "^3.0.9",
+    "vitest": "^0.22.1",
+    "vue": "^3.2.38"
   },
   "peerDependencies": {
     "@vue/compiler-sfc": "^3.2.24",
     "vue": "^3.2.24"
   },
   "dependencies": {
-    "@babel/types": "^7.18.10",
+    "@babel/types": "^7.18.13",
+    "debug": "^4.3.4",
     "fast-glob": "^3.2.11",
-    "local-pkg": "^0.4.2"
+    "local-pkg": "^0.4.2",
+    "picocolors": "^1.0.0"
   }
 }
