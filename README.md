@@ -68,14 +68,33 @@ defineProps<User>()
 - The following syntaxes are not supported currently:
   - `import * as Foo from 'foo'`
   - `export * from 'foo'`
-- nested type parameters (e.g. `defineProps<Props<T>>()`) are not supported.
-- Interface which extends Literal Type or Intersection Type is not supported.
+- [These types](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html) are not supported.
 - Types imported from external packages are not fully supported right now.
 - The plugin currently only scans the content of `<script setup>`. Types defined in `<script>` will be ignored.
 
 ## Notes
 - `Enum` types will be converted to Union Types (e.g. `type [name] = number | string`) , since Vue can't handle them right now.
 - The plugin may be slow because it needs to read files and traverse the AST (using @babel/parser).
+
+## Caveats
+It is not recommended to write **duplicate** imports/exports. It may affect the result of the plugin's transformation. You will get warnings if the plugin detects this kind of code.
+
+Examples:
+
+```javascript
+// These kinds of code will trigger warnings from the plugin
+import { Foo, Foo as Bar } from 'foo'
+
+import { Foo as Bar, Foo as Baz } from 'foo'
+
+export { Foo, Foo as Bar }
+
+export { Foo as Bar, Foo as Baz }
+
+export { Foo, Foo as Bar } from 'foo'
+
+export { Foo as Bar, Foo as Baz } from 'foo'
+```
 
 ## License
 
