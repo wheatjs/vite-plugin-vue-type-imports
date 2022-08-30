@@ -13,4 +13,5 @@ defineTransformTest({
   filePattern: ['./fixtures/common/**/!(_)*.ts'],
   fileName: __filename,
   codeGetter,
+  skip: false,
 })

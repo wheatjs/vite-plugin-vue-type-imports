@@ -26,7 +26,7 @@ import VueTypeImports from 'vite-plugin-vue-type-imports'
 export default defineConfig({
   plugins: [
     Vue(), 
-    VueTypeImports({/* options */}),
+    VueTypeImports(),
   ],
 })
 ```
@@ -64,37 +64,37 @@ defineProps<User>()
 <template>...</template>
 ```
 
-## Options
-```typescript
-VueTypeImports({
-  // Non-practical function
-  // Just for those who want to get a nice output
-  clean: {
-    // Clean redundant newlines ("\n")
-    newline: false,
-    // Clean isolated interfaces which are replaced by a new interface created by the plugin
-    interface: false,
-  }
-})
-```
-
 ## Known limitations
 - The following syntaxes are not supported currently:
-  - `import default`
-  - `import { a as b }`
-  - `export default`
-  - `export * from`
-- nested type parameters (e.g. `defineProps<Props<T>>()`) are not supported.
-- ~~At this stage, the plugin only scans the imported interfaces and does not process the interfaces defined in the SFC~~ Supported in the next release.
-- ~~HMR is not fully supported right now.~~ Fixed in the next release.
-- Interface which extends Literal Type or Intersection Type is not supported.
+  - `import * as Foo from 'foo'`
+  - `export * from 'foo'`
+- [These types](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html) are not supported.
 - Types imported from external packages are not fully supported right now.
-- When interfaces implicitly rely on interfaces with the same name but different structures, the results may be different from what is expected.
 - The plugin currently only scans the content of `<script setup>`. Types defined in `<script>` will be ignored.
 
 ## Notes
 - `Enum` types will be converted to Union Types (e.g. `type [name] = number | string`) , since Vue can't handle them right now.
-- The plugin may be slow because it needs to traverse the AST (using @babel/parser).
+- The plugin may be slow because it needs to read files and traverse the AST (using @babel/parser).
+
+## Caveats
+It is not recommended to write **duplicate** imports/exports. It may affect the result of the plugin's transformation. You will get warnings if the plugin detects this kind of code.
+
+Examples:
+
+```javascript
+// These kinds of code will trigger warnings from the plugin
+import { Foo, Foo as Bar } from 'foo'
+
+import { Foo as Bar, Foo as Baz } from 'foo'
+
+export { Foo, Foo as Bar }
+
+export { Foo as Bar, Foo as Baz }
+
+export { Foo, Foo as Bar } from 'foo'
+
+export { Foo as Bar, Foo as Baz } from 'foo'
+```
 
 ## License
 

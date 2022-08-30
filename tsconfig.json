@@ -8,9 +8,9 @@
     "strict": true,
     "strictNullChecks": true,
     "resolveJsonModule": true,
-    "skipDefaultLibCheck": true,
     "skipLibCheck": true,
-    "types": ["vitest/globals"],
+    "skipDefaultLibCheck": true,
+    "types": ["vitest/globals", "vitest/importMeta"],
     "forceConsistentCasingInFileNames": true
   },
   "exclude": [
