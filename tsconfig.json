@@ -10,7 +10,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "skipLibCheck": true,
     "types": ["vitest/globals", "vitest/importMeta"],
     "forceConsistentCasingInFileNames": true
   },

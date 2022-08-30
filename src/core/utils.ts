@@ -49,8 +49,10 @@ export function debuggerFactory(namespace: string) {
      * NOTE(zorin): Use `console.log` instead when testing.
      * Because the output of the default logger is incomplete (i.e. it will lost some debug messages) when testing.
      */
-    if (import.meta.vitest)
+    if (import.meta.vitest) {
+      /* eslint-disable-next-line no-console */
       _debugger.log = console.log.bind(console)
+    }
 
     return _debugger
   }
