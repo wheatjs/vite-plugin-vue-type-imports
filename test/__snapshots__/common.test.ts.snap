@@ -251,6 +251,20 @@ defineProps<Props>()
 "
 `;
 
+exports[`Common > Redeclaration of types > Same name > index.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo_2 = 'foo_2'
+type _VTI_TYPE_Bar = _VTI_TYPE_Foo_2
+type _VTI_TYPE_Foo = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
 exports[`Common > Strict type finding > Default > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 interface Props {
