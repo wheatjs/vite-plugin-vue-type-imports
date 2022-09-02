@@ -1,5 +1,157 @@
 // Vitest Snapshot v1
 
+exports[`Common > Duplicate imports > Export aliases > 1.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Export aliases > 2.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Export aliases > multi-level.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import aliases > 1.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import aliases > 2.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import aliases > multi-level.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import export default > 1.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import export default > 2.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Duplicate imports > Import export default > multi-level.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Bar = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Bar
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Enum types > Default > empty.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* empty-enum */ number | string
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Enum types > Default > mixed.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* enum */ number | string
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Enum types > Default > number.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* enum */ number
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Enum types > Default > string.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* enum */ string
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
 exports[`Common > Export aliases > Default > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 type _VTI_TYPE_Foo = string
@@ -113,6 +265,33 @@ exports[`Common > Import export default > Use aliases > 3.ts (default) 1`] = `
 type _VTI_TYPE_Foo = string
 interface Props {
   foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Import same type implicitly > Default > 1.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
+  baz: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Import same type implicitly > Default > 2.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = 'foo'
+type _VTI_TYPE_A = _VTI_TYPE_Foo
+interface Props {
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
+  baz: _VTI_TYPE_A
 }
 defineProps<Props>()
 </script>
@@ -256,6 +435,21 @@ exports[`Common > Redeclaration of types > Same name > index.ts (default) 1`] = 
 type _VTI_TYPE_Foo_2 = 'foo_2'
 type _VTI_TYPE_Bar = _VTI_TYPE_Foo_2
 type _VTI_TYPE_Foo = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Bar
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Common > Reference in property > Default > index.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface _VTI_TYPE_Foo {
+  foo: 'foo'
+}
+type _VTI_TYPE_Bar = _VTI_TYPE_Foo
 interface Props {
   foo: _VTI_TYPE_Foo
   bar: _VTI_TYPE_Bar

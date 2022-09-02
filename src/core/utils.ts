@@ -8,7 +8,7 @@ import type { Alias, AliasOptions } from 'vite'
 import { babelParse, generateCodeFrame } from '@vue/compiler-sfc'
 import type { CallExpression, Node, Program, TSEnumDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration } from '@babel/types'
 import type { ExtractedTypes, IExport, IImport } from './ast'
-import { DEFINE_EMITS, DEFINE_PROPS, LogMsg, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
+import { DEFINE_EMITS, DEFINE_PROPS, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
 
 type Pkg = Partial<Record<'types' | 'typings', string>>
 
@@ -49,7 +49,7 @@ export function debuggerFactory(namespace: string) {
      * NOTE(zorin): Use `console.log` instead when testing.
      * Because the output of the default logger is incomplete (i.e. it will lost some debug messages) when testing.
      */
-    if (import.meta.vitest) {
+    if (process.env.VITEST) {
       /* eslint-disable-next-line no-console */
       _debugger.log = console.log.bind(console)
     }
@@ -224,7 +224,7 @@ export function groupImports(imports: IImport[], source: string, fileName: strin
     }
 
     if (importedSpecifiers.includes(rawImport.imported)) {
-      warn(`Duplicate imports of type "${rawImport.imported}" found. ${LogMsg.UNEXPECTED_RESULT}`, {
+      warn(`Duplicate imports of type "${rawImport.imported}" found.`, {
         fileName,
         codeFrame: generateCodeFrame(source, rawImport.start, rawImport.end),
       })
@@ -246,6 +246,20 @@ export function groupImports(imports: IImport[], source: string, fileName: strin
   }, {})
 }
 
+/**
+ * Convert export syntaxes to import syntaxes
+ *
+ * @example
+ * Source:
+ * ```typescript
+ * export { Foo } from 'foo'
+ * ```
+ * Result:
+ * ```typescript
+ * import { Foo } from 'foo'
+ * export { Foo }
+ * ```
+ */
 export function convertExportsToImports(exports: IExport[], groupedImports: GroupedImports): IImport[] {
   const debug = createUtilsDebugger('convertExportsToImports')
 
@@ -333,6 +347,7 @@ export function replaceAtIndexes(source: string, replacements: Replacement[], of
  */
 export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<FullName, NameWithPath>, dependencies: string[]): string[] {
   function _resolveDependencies() {
+    // NOTE(zorin): I don't think users will use same type for defineProps and defineEmits, so currently we do not dedupe them
     const queue: string[] = dependencies
     const result: string[] = []
 
@@ -355,8 +370,10 @@ export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<
 
       const dependencies = extracted.get(key)!.dependencies
 
-      if (dependencies?.length)
-        dependencies.forEach(dep => queue.push(dep))
+      if (dependencies?.length) {
+        // Dedupe dependencies
+        new Set(dependencies).forEach(dep => queue.push(dep))
+      }
     }
 
     return result
@@ -397,7 +414,7 @@ export function resolveExtends(record: Record<string, string[]>) {
 }
 
 export function isNumber(n: MaybeNumber): n is number {
-  return typeof n === 'number'
+  return typeof n === 'number' && n.toString() !== 'NaN'
 }
 
 export function isString(n: MaybeString): n is string {
@@ -429,11 +446,12 @@ export interface LogOptions {
 export function mergeLogMsg(options: LogOptions & { msg: string }) {
   const { msg, fileName, codeFrame } = options
 
+  // NOTE(zorin): We only log basic message in test
   const result = [
     msg,
     '',
-    fileName,
-    codeFrame,
+    process.env.VITEST ? undefined : fileName,
+    process.env.VITEST ? undefined : codeFrame,
   ].filter(notNullish)
 
   // Push newline if the last line is not an empty string

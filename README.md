@@ -77,23 +77,27 @@ defineProps<User>()
 - The plugin may be slow because it needs to read files and traverse the AST (using @babel/parser).
 
 ## Caveats
-It is not recommended to write **duplicate** imports/exports. It may affect the result of the plugin's transformation. You will get warnings if the plugin detects this kind of code.
+**Do not reference the types themselves implicitly, it will cause infinite loop**.
+Vue will also get wrong type definition even if you disable this plugin.
 
-Examples:
+Illegal code:
+```ts
+export type Bar = Foo
+export interface Foo {
+  foo: Bar
+}
+```
 
-```javascript
-// These kinds of code will trigger warnings from the plugin
-import { Foo, Foo as Bar } from 'foo'
+Alternatively, you can reference the types themselves in their own definitions
 
-import { Foo as Bar, Foo as Baz } from 'foo'
+Acceptable code:
+```ts
+export type Bar = string
 
-export { Foo, Foo as Bar }
-
-export { Foo as Bar, Foo as Baz }
-
-export { Foo, Foo as Bar } from 'foo'
-
-export { Foo as Bar, Foo as Baz } from 'foo'
+export interface Foo {
+  foo: Foo
+  bar: Foo | Bar
+}
 ```
 
 ## License
