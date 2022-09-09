@@ -77,7 +77,7 @@ defineProps<User>()
 - The plugin may be slow because it needs to read files and traverse the AST (using @babel/parser).
 
 ## Caveats
-**Do not reference the types themselves implicitly, it will cause infinite loop**.
+- **Do not reference the types themselves implicitly, it will cause infinite loop**.
 Vue will also get wrong type definition even if you disable this plugin.
 
 Illegal code:
@@ -98,6 +98,14 @@ export interface Foo {
   foo: Foo
   bar: Foo | Bar
 }
+```
+
+- Ending the type name with something like `_1` and `_2` is not recommended, because it may **conflict** with the plugin's transformation result
+
+These types may cause conflicts:
+```ts
+type Foo_1 = string
+type Bar_2 = number
 ```
 
 ## License
