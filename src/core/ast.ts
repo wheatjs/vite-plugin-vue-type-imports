@@ -25,6 +25,7 @@ import type {
   TSTypes,
 } from './utils'
 import {
+  at,
   convertExportsToImports,
   debuggerFactory,
   getAst,
@@ -503,7 +504,7 @@ export async function extractTypesFromSource(
   }
 
   function unwrapPath(key: NameWithPath): string {
-    return key.split(':').at(-1)!
+    return at(key.split(':'), -1)
   }
 
   function setNamesMap(fullName: FullName, nameWithPath: NameWithPath) {
@@ -632,7 +633,7 @@ export async function extractTypesFromSource(
       const arr = m[2].split('_')
 
       // Remove prefix if exists
-      if (isNumber(parseInt(arr.at(-1)!)))
+      if (isNumber(parseInt(at(arr, -1))))
         arr.pop()
 
       result = arr.join('_')
@@ -1078,7 +1079,7 @@ export async function extractTypesFromSource(
 
     const { hasDuplicateImports, referenceSource } = (getMetaData(enumName) || {}) as ReferenceTypeMetaData
 
-    const referenceSourceFile = referenceSource.split(':').at(-2)!
+    const referenceSourceFile = at(referenceSource.split(':'), -2)
 
     // Remove extra specifier if it is referenced from SFC
     if (/\.vue$/.test(referenceSourceFile)) {

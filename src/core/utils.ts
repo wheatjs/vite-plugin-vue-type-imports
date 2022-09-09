@@ -41,6 +41,25 @@ export type MaybeNumber = number | null | undefined
 
 export type MaybeNode = Node | null | undefined
 
+/**
+ * References:
+ * https://github.com/tc39/proposal-relative-indexing-method#polyfill
+ * https://github.com/antfu/utils/blob/main/src/array.ts
+ */
+export function at(arr: [], index: number): undefined
+export function at<T>(arr: T[], index: number): T
+export function at<T>(arr: T[] | [], index: number): T | undefined {
+  const length = arr.length
+
+  if (index < 0)
+    index += length
+
+  if (index < 0 || index > length || !length)
+    return undefined
+
+  return arr[index]
+}
+
 export function debuggerFactory(namespace: string) {
   return (name?: string) => {
     const _debugger = _debug(`${PLUGIN_NAME}:${namespace}${name ? `:${name}` : ''}`)
@@ -455,7 +474,7 @@ export function mergeLogMsg(options: LogOptions & { msg: string }) {
   ].filter(notNullish)
 
   // Push newline if the last line is not an empty string
-  if (result.at(-1))
+  if (at(result, -1))
     result.push('')
 
   return result.join('\n')
