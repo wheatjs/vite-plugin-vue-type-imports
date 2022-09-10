@@ -14,10 +14,10 @@ defineProps<Props>()
 
 exports[`Common > Duplicate imports > Export aliases > 2.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-type _VTI_TYPE_Bar = 'foo'
+type _VTI_TYPE_Foo = 'foo'
 interface Props {
-  foo: _VTI_TYPE_Bar
-  bar: _VTI_TYPE_Bar
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
 }
 defineProps<Props>()
 </script>
@@ -74,10 +74,10 @@ defineProps<Props>()
 
 exports[`Common > Duplicate imports > Import export default > 1.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-type _VTI_TYPE_Bar = 'foo'
+type _VTI_TYPE_Foo = 'foo'
 interface Props {
-  foo: _VTI_TYPE_Bar
-  bar: _VTI_TYPE_Bar
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
 }
 defineProps<Props>()
 </script>
@@ -86,10 +86,10 @@ defineProps<Props>()
 
 exports[`Common > Duplicate imports > Import export default > 2.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-type _VTI_TYPE_Bar = 'foo'
+type _VTI_TYPE_Foo = 'foo'
 interface Props {
-  foo: _VTI_TYPE_Bar
-  bar: _VTI_TYPE_Bar
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
 }
 defineProps<Props>()
 </script>
@@ -98,10 +98,10 @@ defineProps<Props>()
 
 exports[`Common > Duplicate imports > Import export default > multi-level.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-type _VTI_TYPE_Bar = 'foo'
+type _VTI_TYPE_Foo = 'foo'
 interface Props {
-  foo: _VTI_TYPE_Bar
-  bar: _VTI_TYPE_Bar
+  foo: _VTI_TYPE_Foo
+  bar: _VTI_TYPE_Foo
 }
 defineProps<Props>()
 </script>
