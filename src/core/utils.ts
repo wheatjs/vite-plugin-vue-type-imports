@@ -202,7 +202,6 @@ export type LocationMap = Record<string, Pick<IImport, 'start' | 'end'>>
 
 export interface ImportInfo {
   aliases: Record<string, string>
-  locationMap: LocationMap
   localSpecifiers: string[]
 }
 
@@ -238,7 +237,6 @@ export function groupImports(imports: IImport[], source: string, fileName: strin
   return imports.reduce<GroupedImports>((res, rawImport) => {
     res[rawImport.path] ||= {
       aliases: {},
-      locationMap: {},
       localSpecifiers: [],
     }
 
@@ -251,11 +249,6 @@ export function groupImports(imports: IImport[], source: string, fileName: strin
 
     const importInfo = res[rawImport.path]
     importInfo.localSpecifiers.push(rawImport.local)
-    importInfo.locationMap[rawImport.local] = {
-      start: rawImport.start,
-      end: rawImport.end,
-    }
-
     importedSpecifiers.push(rawImport.imported)
 
     if (rawImport.local !== rawImport.imported)
