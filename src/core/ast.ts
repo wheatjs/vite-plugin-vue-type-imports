@@ -452,6 +452,8 @@ export async function extractTypesFromSource(
 
       const sourceRecord = getSharedMetaData(maybeAlias)!.replacementTargets!
 
+      emptyMetaData(maybeAlias)
+
       targetRecord.push(...sourceRecord)
     }
     else {
@@ -542,8 +544,8 @@ export async function extractTypesFromSource(
     }
   }
 
-  function deleteMetaData(name: string) {
-    debug('Delete metadata %s', name)
+  function emptyMetaData(name: string) {
+    debug('Empty metadata %s', name)
     localMetaDataMap[name] = undefined
   }
 
@@ -554,7 +556,7 @@ export async function extractTypesFromSource(
 
     const targetRecord = (setMetaData(name, getSharedMetaData(from)!) as TypeMetaData).replacementTargets!
 
-    deleteMetaData(from)
+    emptyMetaData(from)
 
     /**
      * If sourceRecord exists, it means that user also imported the original (local) name of the type
