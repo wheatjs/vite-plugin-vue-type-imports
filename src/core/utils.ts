@@ -200,12 +200,12 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
 
 export type LocationMap = Record<string, Pick<IImport, 'start' | 'end'>>
 
-export interface ImportInfo {
-  aliases: Record<string, string>
-  localSpecifiers: string[]
-}
+export type GroupedImports = Record<string, Record<string, string>>
 
-export type GroupedImports = Record<string, ImportInfo>
+export interface GroupedImportsResult {
+  groupedImports: GroupedImports
+  localSpecifierMap: Record<string, string>
+}
 
 /**
  * Categorize imports
@@ -219,43 +219,54 @@ export type GroupedImports = Record<string, ImportInfo>
  * console.log(groupedImports)
  * // Result:
  * {
- *   example: {
- *     aliases: {
+ *   groupedImports: {
+ *     example: {
  *       bb: 'a',
  *       cc: 'b',
  *       aa: 'c'
- *     },
- *     locationMap: {...},
- *     localSpecifiers: ['bb', 'cc', 'aa']
+ *     }
+ *   },
+ *   localSpecifierMap: {
+ *     a: 'example',
+ *     b: 'example',
+ *     c: 'example'
  *   }
  * }
  * ```
  */
-export function groupImports(imports: IImport[], source: string, fileName: string) {
-  const importedSpecifiers: string[] = []
+export function groupImports(imports: IImport[], source: string, fileName: string): GroupedImportsResult {
+  const importedSpecifierMap: Record<string, string[]> = {}
+  const localSpecifierMap: Record<string, string> = {}
 
-  return imports.reduce<GroupedImports>((res, rawImport) => {
-    res[rawImport.path] ||= {
-      aliases: {},
-      localSpecifiers: [],
-    }
+  const groupedImports = imports.reduce<GroupedImports>((res, rawImport) => {
+    const importedSpecifiers = importedSpecifierMap[rawImport.path]
 
-    if (importedSpecifiers.includes(rawImport.imported)) {
+    if (importedSpecifiers?.length && importedSpecifiers.includes(rawImport.imported)) {
       warn(`Duplicate imports of type "${rawImport.imported}" found.`, {
         fileName,
         codeFrame: generateCodeFrame(source, rawImport.start, rawImport.end),
       })
     }
 
-    const importInfo = res[rawImport.path]
-    importInfo.localSpecifiers.push(rawImport.local)
-    importedSpecifiers.push(rawImport.imported)
+    res[rawImport.path] ||= {}
+
+    const aliases = res[rawImport.path]
+
+    localSpecifierMap[rawImport.local] = rawImport.path
+
+    importedSpecifierMap[rawImport.path] ||= []
+    importedSpecifierMap[rawImport.path].push(rawImport.imported)
 
     if (rawImport.local !== rawImport.imported)
-      importInfo.aliases[rawImport.local] = rawImport.imported
+      aliases[rawImport.local] = rawImport.imported
 
     return res
   }, {})
+
+  return {
+    groupedImports,
+    localSpecifierMap,
+  }
 }
 
 /**
@@ -272,27 +283,16 @@ export function groupImports(imports: IImport[], source: string, fileName: strin
  * export { Foo }
  * ```
  */
-export function convertExportsToImports(exports: IExport[], groupedImports: GroupedImports): IImport[] {
-  const debug = createUtilsDebugger('convertExportsToImports')
-
-  // localSpecifier -> modulePath
-  const specifiersMap = Object.entries(groupedImports).reduce<Record<string, string>>((res, [modulePath, importInfo]) => {
-    importInfo.localSpecifiers.forEach((s) => {
-      res[s] = modulePath
-    })
-
-    return res
-  }, {})
-
-  debug('Specifiers map: %O', specifiersMap)
+export function convertExportsToImports(exports: IExport[], groupImportsResult: GroupedImportsResult): IImport[] {
+  const { groupedImports, localSpecifierMap } = groupImportsResult
 
   return exports.map(({ start, end, local, exported, path }) => {
-    if (path || specifiersMap[local]) {
-      const mappedPath = specifiersMap[local]
+    if (path || localSpecifierMap[local]) {
+      const mappedPath = localSpecifierMap[local]
       let imported = local
 
       if (!path && isString(mappedPath))
-        imported = groupedImports[mappedPath].aliases[local] || local
+        imported = groupedImports[mappedPath][local] || local
 
       return {
         start,
@@ -307,6 +307,7 @@ export function convertExportsToImports(exports: IExport[], groupedImports: Grou
   }).filter(notNullish)
 }
 
+// NOTE(zorin): Not used for now
 export function intersect<A = any, B = any>(a: Array<A>, b: Array<B>): (A | B)[] {
   const setB = new Set(b)
   // @ts-expect-error unnecessary type checking (for now)
@@ -373,10 +374,8 @@ export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<
        *
        * NOTE(zorin): The only situation I know is invalid type (Types that are not even found after the recursion completes)
        */
-      if (!key) {
-        warn(`Invalid type found: ${shift}`)
+      if (!key)
         continue
-      }
 
       result.push(key)
 

@@ -17,7 +17,7 @@ import type {
 } from '@babel/types'
 import type {
   FullName,
-  GroupedImports,
+  GroupedImportsResult,
   MaybeAliases,
   MaybeNumber,
   NameWithPath,
@@ -30,7 +30,6 @@ import {
   debuggerFactory,
   getAst,
   groupImports,
-  intersect,
   isDefineEmits,
   isDefineProps,
   isEnum,
@@ -39,6 +38,7 @@ import {
   isTSTypes,
   isWithDefaults,
   resolveModulePath,
+  warn,
 } from './utils'
 
 const enum Prefixes {
@@ -416,7 +416,7 @@ export async function extractTypesFromSource(
   debug('Counter: %O', extractedKeysCounter)
 
   // Categorize imports
-  const groupedImports = groupImports(imports, source, relativePath)
+  const groupedImportsResult = groupImports(imports, source, relativePath)
 
   const { localNodeMap, exportedNodeMap } = getTSNodeMap(extractAllTypescriptTypesFromAST(ast), namedExports)
 
@@ -1135,142 +1135,158 @@ export async function extractTypesFromSource(
   /**
    * TODO(zorin): Remove corresponding replacements and dependencies if we could not find the type
    */
-  async function findMissingTypes(missingTypes: string[], groupedImports: GroupedImports) {
-    debug('Missing types: %O', missingTypes)
-    debug('Grouped imports: %O', groupedImports)
+  async function findMissingTypesFromImport(modulePath: string, aliases: Record<string, string>, missingTypes: string[]) {
+    debug('Find missing types %O from \'%s\'', missingTypes, modulePath)
+    // imported -> local[]
+    const importAliasRecord: Record<string, string[]> = {}
 
-    for (const [modulePath, importInfo] of Object.entries(groupedImports)) {
-      // Get intersection (it will also dedupe the elements)
-      const intersection = intersect(importInfo.localSpecifiers, missingTypes)
+    // Generate new extract aliases (originalName -> userAlias) to replace the name of types
+    const newExtractAliases = missingTypes.reduce<Record<string, string>>((res, maybeAlias) => {
+      const originalName = aliases[maybeAlias]
 
-      debug('Intersection: %O', intersection)
+      if (!originalName) {
+        /**
+          * NOTE(zorin): Apply alias for `import { default } from 'foo'`
+          * In theory, this kind of syntax is only produced by the plugin (Users will get errors from TS if they write this kind of code)
+          * The plugin converts `export { default } from 'foo'` to `import { default } from 'foo';export { default }`
+          */
+        if (maybeAlias === 'default') {
+          const alias = extractAliases.default
+          res.default = alias
+          setMetaData(alias, getMetaData('default')!)
+        }
 
-      if (intersection.length) {
-        const moduleImportAliases = importInfo.aliases
-
-        // imported -> local[]
-        const importAliasRecord: Record<string, string[]> = {}
-
-        // Generate new extract aliases (originalName -> userAlias) to replace the name of types
-        const newExtractAliases = intersection.reduce<Record<string, string>>((res, maybeAlias) => {
-          const originalName = moduleImportAliases[maybeAlias]
-
-          if (!originalName) {
-            /**
-             * NOTE(zorin): Apply alias for `import { default } from 'foo'`
-             * In theory, this kind of syntax is only produced by the plugin (Users will get errors from TS if they write this kind of code)
-             * The plugin converts `export { default } from 'foo'` to `import { default } from 'foo';export { default }`
-             */
-            if (maybeAlias === 'default') {
-              const alias = extractAliases.default
-              res.default = alias
-              setMetaData(alias, getMetaData('default')!)
-            }
-
-            // Skip when it is exactly the imported name
-            return res
-          }
-
-          const alias = res[originalName]
-
-          // Add replacements to the existing's if we have already found an alias
-          if (isString(alias)) {
-            debug('Add replacements of %s to %s', maybeAlias, alias)
-
-            const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
-
-            const sourceRecord = replacementRecord[maybeAlias] || getSharedMetaData(maybeAlias)!.replacementTargets!
-
-            targetRecord.push(...sourceRecord)
-          }
-          else {
-            res[originalName] = maybeAlias
-          }
-
-          importAliasRecord[originalName] ||= []
-          importAliasRecord[originalName].push(maybeAlias)
-
-          return res
-        }, {})
-
-        Object.entries(importAliasRecord).forEach(([typeName, record]) => {
-          // Add metadata if it has multiple aliases
-          if (record.length > 1) {
-            const alias = newExtractAliases[typeName]
-
-            setMetaData(alias, {
-              hasDuplicateImports: true,
-            })
-          }
-        })
-
-        debug('New extract aliases: %O', newExtractAliases)
-
-        // Apply aliases and record the number of times each type appears (also we dedupe them in this step)
-        const typeCounter = intersection.reduce<Record<string, number>>((counter, _name) => {
-          const name = moduleImportAliases[_name] || _name
-
-          counter[name] ??= 0
-
-          counter[name] += 1
-
-          return counter
-        }, {})
-
-        // Unwrap aliases (userAlias -> originalName) to find types
-        const processedIntersection = Object.entries(typeCounter).map(([typeName, count]) => {
-          /**
-           * If the type has duplicate imports and its number does not match the number of its aliases,
-           * it means that the user also imported the original(exported) name of the type
-           * @example
-           * ```typescript
-           * import { Foo, Foo as Bar } from 'foo'
-           * ```
-           */
-          if (count > 1 && count !== importAliasRecord[typeName].length) {
-            const alias = newExtractAliases[typeName]
-
-            debug('Push replacements of %s to %s (Original)', typeName, alias)
-
-            const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
-
-            const sourceRecord = replacementRecord[typeName] || getSharedMetaData(typeName)!.replacementTargets!
-
-            targetRecord.push(...sourceRecord)
-
-            setMetaData(alias, {
-              hasDuplicateImports: true,
-            })
-          }
-
-          return typeName
-        })
-
-        debug('Processed intersection: %O', processedIntersection)
-
-        // Generate aliases that apply the existing extract aliases for new extract aliases if exists
-        const processedNewExtractAliases = Object.fromEntries(Object.entries(newExtractAliases).map(([originalName, userAlias]) => [originalName, extractAliases[userAlias] || userAlias]))
-
-        debug('Processed new extract aliases: %O', processedNewExtractAliases)
-
-        // Generate new metadata map from the missing types
-        const newMetaDataMap = processedIntersection.reduce<Record<string, TypeMetaData>>((res, typeName) => {
-          // Apply new extract alias if exists
-          const name = newExtractAliases[typeName] || typeName
-          const metaData = getMetaData(name)
-
-          if (metaData) {
-            (metaData as TypeMetaData).replacementTargets ||= replacementRecord[name]
-
-            res[typeName] = metaData
-          }
-
-          return res
-        }, {})
-
-        await extractTypesFromModule(modulePath, processedIntersection, processedNewExtractAliases, newMetaDataMap)
+        // Skip when it is exactly the imported name
+        return res
       }
-    }
+
+      const alias = res[originalName]
+
+      // Add replacements to the existing's if we have already found an alias
+      if (isString(alias)) {
+        debug('Add replacements of %s to %s', maybeAlias, alias)
+
+        const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
+
+        const sourceRecord = replacementRecord[maybeAlias] || getSharedMetaData(maybeAlias)!.replacementTargets!
+
+        targetRecord.push(...sourceRecord)
+      }
+      else {
+        res[originalName] = maybeAlias
+      }
+
+      importAliasRecord[originalName] ||= []
+      importAliasRecord[originalName].push(maybeAlias)
+
+      return res
+    }, {})
+
+    Object.entries(importAliasRecord).forEach(([typeName, record]) => {
+      // Add metadata if it has multiple aliases
+      if (record.length > 1) {
+        const alias = newExtractAliases[typeName]
+
+        setMetaData(alias, {
+          hasDuplicateImports: true,
+        })
+      }
+    })
+
+    debug('New extract aliases: %O', newExtractAliases)
+
+    // Apply aliases and record the number of times each type appears (also we dedupe them in this step)
+    const typeCounter = missingTypes.reduce<Record<string, number>>((counter, _name) => {
+      const name = aliases[_name] || _name
+
+      counter[name] ??= 0
+
+      counter[name] += 1
+
+      return counter
+    }, {})
+
+    // Unwrap aliases (userAlias -> originalName) to find types
+    const processedMissingTypes = Object.entries(typeCounter).map(([typeName, count]) => {
+      /**
+        * If the type has duplicate imports and its number does not match the number of its aliases,
+        * it means that the user also imported the original(exported) name of the type
+        * @example
+        * ```typescript
+        * import { Foo, Foo as Bar } from 'foo'
+        * ```
+        */
+      if (count > 1 && count !== importAliasRecord[typeName].length) {
+        const alias = newExtractAliases[typeName]
+
+        debug('Push replacements of %s to %s (Original)', typeName, alias)
+
+        const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
+
+        const sourceRecord = replacementRecord[typeName] || getSharedMetaData(typeName)!.replacementTargets!
+
+        targetRecord.push(...sourceRecord)
+
+        setMetaData(alias, {
+          hasDuplicateImports: true,
+        })
+      }
+
+      return typeName
+    })
+
+    debug('Processed missing types: %O', processedMissingTypes)
+
+    // Generate aliases that apply the existing extract aliases for new extract aliases if exists
+    const processedNewExtractAliases = Object.fromEntries(Object.entries(newExtractAliases).map(([originalName, userAlias]) => [originalName, extractAliases[userAlias] || userAlias]))
+
+    debug('Processed new extract aliases: %O', processedNewExtractAliases)
+
+    // Generate new metadata map from the missing types
+    const newMetaDataMap = processedMissingTypes.reduce<Record<string, TypeMetaData>>((res, typeName) => {
+      // Apply new extract alias if exists
+      const name = newExtractAliases[typeName] || typeName
+      const metaData = getMetaData(name)
+
+      if (metaData) {
+        (metaData as TypeMetaData).replacementTargets ||= replacementRecord[name]
+
+        res[typeName] = metaData
+      }
+
+      return res
+    }, {})
+
+    await extractTypesFromModule(modulePath, processedMissingTypes, processedNewExtractAliases, newMetaDataMap)
+  }
+
+  async function findMissingTypes(missingTypes: string[], groupImportsResult: GroupedImportsResult): Promise<string[]> {
+    const unresolved: string[] = []
+
+    const { groupedImports, localSpecifierMap } = groupImportsResult
+
+    debug('Grouped imports: %O', groupedImports)
+    debug('Local specifier map: %O', localSpecifierMap)
+
+    const resolvedImports = missingTypes.reduce<Record<string, string[]>>((res, typeName) => {
+      const modulePath = localSpecifierMap[typeName]
+
+      if (isString(modulePath)) {
+        res[modulePath] ||= []
+        res[modulePath].push(typeName)
+      }
+      else {
+        warn(`Cannot find type: ${typeName}`)
+        unresolved.push(typeName)
+      }
+
+      return res
+    }, {})
+
+    for (const [modulePath, types] of Object.entries(resolvedImports))
+      await findMissingTypesFromImport(modulePath, groupedImports[modulePath], [...new Set(types)])
+
+    return unresolved
   }
 
   for (const typeName of processedTypes)
@@ -1282,7 +1298,7 @@ export async function extractTypesFromSource(
   if (missingTypes.local.length) {
     debug('Find missing types (Local)')
 
-    await findMissingTypes(missingTypes.local, groupedImports)
+    await findMissingTypes(missingTypes.local, groupedImportsResult)
   }
 
   if (missingTypes.requested.length) {
@@ -1292,9 +1308,9 @@ export async function extractTypesFromSource(
      * NOTE(zorin): For development convenience, we currently convert the export syntaxes to import syntaxes.
      * This behavior may be changed in the future
      */
-    const groupedExports = groupImports(convertExportsToImports([...namedExports, ...namedFromExports], groupedImports), source, relativePath)
+    const groupedExportsResult = groupImports(convertExportsToImports([...namedExports, ...namedFromExports], groupedImportsResult), source, relativePath)
 
-    await findMissingTypes(missingTypes.requested, groupedExports)
+    await findMissingTypes(missingTypes.requested, groupedExportsResult)
   }
 
   return {
