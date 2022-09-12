@@ -8,7 +8,7 @@ import type { Alias, AliasOptions } from 'vite'
 import { babelParse, generateCodeFrame } from '@vue/compiler-sfc'
 import type { CallExpression, Node, Program, TSEnumDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration } from '@babel/types'
 import type { ExtractedTypes, IExport, IImport } from './ast'
-import { DEFINE_EMITS, DEFINE_PROPS, LogMsg, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
+import { DEFINE_EMITS, DEFINE_PROPS, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
 
 type Pkg = Partial<Record<'types' | 'typings', string>>
 
@@ -41,6 +41,25 @@ export type MaybeNumber = number | null | undefined
 
 export type MaybeNode = Node | null | undefined
 
+/**
+ * References:
+ * https://github.com/tc39/proposal-relative-indexing-method#polyfill
+ * https://github.com/antfu/utils/blob/main/src/array.ts
+ */
+export function at(arr: [], index: number): undefined
+export function at<T>(arr: T[], index: number): T
+export function at<T>(arr: T[] | [], index: number): T | undefined {
+  const length = arr.length
+
+  if (index < 0)
+    index += length
+
+  if (index < 0 || index > length || !length)
+    return undefined
+
+  return arr[index]
+}
+
 export function debuggerFactory(namespace: string) {
   return (name?: string) => {
     const _debugger = _debug(`${PLUGIN_NAME}:${namespace}${name ? `:${name}` : ''}`)
@@ -49,7 +68,7 @@ export function debuggerFactory(namespace: string) {
      * NOTE(zorin): Use `console.log` instead when testing.
      * Because the output of the default logger is incomplete (i.e. it will lost some debug messages) when testing.
      */
-    if (import.meta.vitest) {
+    if (process.env.VITEST) {
       /* eslint-disable-next-line no-console */
       _debugger.log = console.log.bind(console)
     }
@@ -181,13 +200,12 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
 
 export type LocationMap = Record<string, Pick<IImport, 'start' | 'end'>>
 
-export interface ImportInfo {
-  aliases: Record<string, string>
-  locationMap: LocationMap
-  localSpecifiers: string[]
-}
+export type GroupedImports = Record<string, Record<string, string>>
 
-export type GroupedImports = Record<string, ImportInfo>
+export interface GroupedImportsResult {
+  groupedImports: GroupedImports
+  localSpecifierMap: Record<string, string>
+}
 
 /**
  * Categorize imports
@@ -201,72 +219,80 @@ export type GroupedImports = Record<string, ImportInfo>
  * console.log(groupedImports)
  * // Result:
  * {
- *   example: {
- *     aliases: {
+ *   groupedImports: {
+ *     example: {
  *       bb: 'a',
  *       cc: 'b',
  *       aa: 'c'
- *     },
- *     locationMap: {...},
- *     localSpecifiers: ['bb', 'cc', 'aa']
+ *     }
+ *   },
+ *   localSpecifierMap: {
+ *     a: 'example',
+ *     b: 'example',
+ *     c: 'example'
  *   }
  * }
  * ```
  */
-export function groupImports(imports: IImport[], source: string, fileName: string) {
-  const importedSpecifiers: string[] = []
+export function groupImports(imports: IImport[], source: string, fileName: string): GroupedImportsResult {
+  const importedSpecifierMap: Record<string, string[]> = {}
+  const localSpecifierMap: Record<string, string> = {}
 
-  return imports.reduce<GroupedImports>((res, rawImport) => {
-    res[rawImport.path] ||= {
-      aliases: {},
-      locationMap: {},
-      localSpecifiers: [],
-    }
+  const groupedImports = imports.reduce<GroupedImports>((res, rawImport) => {
+    const importedSpecifiers = importedSpecifierMap[rawImport.path]
 
-    if (importedSpecifiers.includes(rawImport.imported)) {
-      warn(`Duplicate imports of type "${rawImport.imported}" found. ${LogMsg.UNEXPECTED_RESULT}`, {
+    if (importedSpecifiers?.length && importedSpecifiers.includes(rawImport.imported)) {
+      warn(`Duplicate imports of type "${rawImport.imported}" found.`, {
         fileName,
         codeFrame: generateCodeFrame(source, rawImport.start, rawImport.end),
       })
     }
 
-    const importInfo = res[rawImport.path]
-    importInfo.localSpecifiers.push(rawImport.local)
-    importInfo.locationMap[rawImport.local] = {
-      start: rawImport.start,
-      end: rawImport.end,
-    }
+    res[rawImport.path] ||= {}
 
-    importedSpecifiers.push(rawImport.imported)
+    const aliases = res[rawImport.path]
+
+    localSpecifierMap[rawImport.local] = rawImport.path
+
+    importedSpecifierMap[rawImport.path] ||= []
+    importedSpecifierMap[rawImport.path].push(rawImport.imported)
 
     if (rawImport.local !== rawImport.imported)
-      importInfo.aliases[rawImport.local] = rawImport.imported
+      aliases[rawImport.local] = rawImport.imported
 
     return res
   }, {})
+
+  return {
+    groupedImports,
+    localSpecifierMap,
+  }
 }
 
-export function convertExportsToImports(exports: IExport[], groupedImports: GroupedImports): IImport[] {
-  const debug = createUtilsDebugger('convertExportsToImports')
-
-  // localSpecifier -> modulePath
-  const specifiersMap = Object.entries(groupedImports).reduce<Record<string, string>>((res, [modulePath, importInfo]) => {
-    importInfo.localSpecifiers.forEach((s) => {
-      res[s] = modulePath
-    })
-
-    return res
-  }, {})
-
-  debug('Specifiers map: %O', specifiersMap)
+/**
+ * Convert export syntaxes to import syntaxes
+ *
+ * @example
+ * Source:
+ * ```typescript
+ * export { Foo } from 'foo'
+ * ```
+ * Result:
+ * ```typescript
+ * import { Foo } from 'foo'
+ * export { Foo }
+ * ```
+ */
+export function convertExportsToImports(exports: IExport[], groupImportsResult: GroupedImportsResult): IImport[] {
+  const { groupedImports, localSpecifierMap } = groupImportsResult
 
   return exports.map(({ start, end, local, exported, path }) => {
-    if (path || specifiersMap[local]) {
-      const mappedPath = specifiersMap[local]
+    if (path || localSpecifierMap[local]) {
+      const mappedPath = localSpecifierMap[local]
       let imported = local
 
       if (!path && isString(mappedPath))
-        imported = groupedImports[mappedPath].aliases[local] || local
+        imported = groupedImports[mappedPath][local] || local
 
       return {
         start,
@@ -281,6 +307,7 @@ export function convertExportsToImports(exports: IExport[], groupedImports: Grou
   }).filter(notNullish)
 }
 
+// NOTE(zorin): Not used for now
 export function intersect<A = any, B = any>(a: Array<A>, b: Array<B>): (A | B)[] {
   const setB = new Set(b)
   // @ts-expect-error unnecessary type checking (for now)
@@ -333,6 +360,7 @@ export function replaceAtIndexes(source: string, replacements: Replacement[], of
  */
 export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<FullName, NameWithPath>, dependencies: string[]): string[] {
   function _resolveDependencies() {
+    // NOTE(zorin): I don't think users will use same type for defineProps and defineEmits, so currently we do not dedupe them
     const queue: string[] = dependencies
     const result: string[] = []
 
@@ -346,17 +374,17 @@ export function resolveDependencies(extracted: ExtractedTypes, namesMap: Record<
        *
        * NOTE(zorin): The only situation I know is invalid type (Types that are not even found after the recursion completes)
        */
-      if (!key) {
-        warn(`Invalid type found: ${shift}`)
+      if (!key)
         continue
-      }
 
       result.push(key)
 
       const dependencies = extracted.get(key)!.dependencies
 
-      if (dependencies?.length)
-        dependencies.forEach(dep => queue.push(dep))
+      if (dependencies?.length) {
+        // Dedupe dependencies
+        new Set(dependencies).forEach(dep => queue.push(dep))
+      }
     }
 
     return result
@@ -397,7 +425,7 @@ export function resolveExtends(record: Record<string, string[]>) {
 }
 
 export function isNumber(n: MaybeNumber): n is number {
-  return typeof n === 'number'
+  return typeof n === 'number' && n.toString() !== 'NaN'
 }
 
 export function isString(n: MaybeString): n is string {
@@ -429,15 +457,16 @@ export interface LogOptions {
 export function mergeLogMsg(options: LogOptions & { msg: string }) {
   const { msg, fileName, codeFrame } = options
 
+  // NOTE(zorin): We only log basic message in test
   const result = [
     msg,
     '',
-    fileName,
-    codeFrame,
+    process.env.VITEST ? undefined : fileName,
+    process.env.VITEST ? undefined : codeFrame,
   ].filter(notNullish)
 
   // Push newline if the last line is not an empty string
-  if (result.at(-1))
+  if (at(result, -1))
     result.push('')
 
   return result.join('\n')

@@ -15,11 +15,9 @@ import type {
   TSTypeReference,
   TSUnionType,
 } from '@babel/types'
-import { generateCodeFrame } from '@vue/compiler-sfc'
 import type {
   FullName,
-  GroupedImports,
-  LocationMap,
+  GroupedImportsResult,
   MaybeAliases,
   MaybeNumber,
   NameWithPath,
@@ -27,11 +25,11 @@ import type {
   TSTypes,
 } from './utils'
 import {
+  at,
   convertExportsToImports,
   debuggerFactory,
   getAst,
   groupImports,
-  intersect,
   isDefineEmits,
   isDefineProps,
   isEnum,
@@ -42,9 +40,8 @@ import {
   resolveModulePath,
   warn,
 } from './utils'
-import { LogMsg } from './constants'
 
-enum Prefixes {
+const enum Prefixes {
   Default = '_VTI_TYPE_',
   Empty = '',
 }
@@ -294,17 +291,26 @@ function extractAllTypescriptTypesFromAST(ast: Program): Record<'local' | 'expor
   }
 }
 
-export interface TypeMetaData {
-  // The source type which reference this
+export interface LocalTypeMetaData {
+  // The source type which reference current type
   referenceSource?: string
-  replacementIndex?: number
-  dependencyIndex?: number
-  // metadata for interfaces
-  sourceInterfaceName?: string
-  isProperty?: boolean
+  // The interface which extends current interface
+  extendTarget?: string
   // Whether it is used in vue macros
   isUsedType?: boolean
+  hasDuplicateImports?: boolean
 }
+
+export interface ReplacementRecord {
+  target: FullName
+  source: NameWithPath
+}
+
+export type TypeMetaData = Omit<LocalTypeMetaData, 'referenceSource'> & {
+  replacementTargets?: ReplacementRecord[]
+}
+
+export type ReferenceTypeMetaData = LocalTypeMetaData & { referenceSource: NameWithPath }
 
 export interface ExtractedTypeReplacement {
   offset: number
@@ -326,6 +332,7 @@ export interface ExtractTypesFromSourceOptions {
   metaDataMap: Record<string, TypeMetaData>
   extractAliases?: Record<string, string>
   // Data shared across recursions
+  extraSpecifiers?: string[]
   extractedKeysCounter?: Record<string, number>
   extractedNamesMap?: Record<FullName, NameWithPath>
   extractedTypes?: ExtractedTypes
@@ -344,6 +351,20 @@ export interface ExtractResult {
   importNodes: ImportDeclaration[]
   extraSpecifiers: string[]
   sourceReplacements: Replacement[]
+}
+
+interface PreExtractionOptions {
+  name: string
+  metaData: ReferenceTypeMetaData
+  replaceLocation: Omit<Replacement, 'replacement'>
+}
+
+interface PostExtractionOptions {
+  key: NameWithPath
+  name: string
+  fullName: FullName
+  metaData: LocalTypeMetaData
+  isEnum?: boolean
 }
 
 /**
@@ -365,6 +386,7 @@ export async function extractTypesFromSource(
     extractedTypes = new Map<NameWithPath, ExtractedTypeInfo>(),
     extractedTypeReplacements = {},
     interfaceExtendsRecord = {},
+    extraSpecifiers = [],
 
     ast = getAst(source),
     isInSFC = false,
@@ -372,15 +394,18 @@ export async function extractTypesFromSource(
 
   const debug = createAstDebugger('extractTypesFromSource')
 
-  debug('In SFC: %o', isInSFC)
-  debug('Types to find: %o', types)
-  debug('Metadata Map: %O', metaDataMap)
-  debug('Extract aliases: %O', extractAliases)
-
   const missingTypes: Record<'local' | 'requested', string[]> = {
     local: [],
     requested: [],
   }
+
+  const localMetaDataMap: Record<string, LocalTypeMetaData | undefined> = metaDataMap
+  const replacementRecord: Record<string, ReplacementRecord[]> = {}
+
+  debug('In SFC: %o', isInSFC)
+  debug('Types to find: %o', types)
+  debug('Local metadata map: %O', localMetaDataMap)
+  debug('Extract aliases: %O', extractAliases)
 
   // Get external types
   const { imports, importNodes } = getAvailableImportsFromAst(ast)
@@ -388,80 +413,78 @@ export async function extractTypesFromSource(
   const { namedExports, namedFromExports } = getAvailableExportsFromAst(ast)
 
   debug('Relative path: %s', relativePath)
-  debug('Source: %s', source)
   debug('Counter: %O', extractedKeysCounter)
 
   // Categorize imports
-  const groupedImports = groupImports(imports, source, relativePath)
+  const groupedImportsResult = groupImports(imports, source, relativePath)
 
   const { localNodeMap, exportedNodeMap } = getTSNodeMap(extractAllTypescriptTypesFromAST(ast), namedExports)
 
-  let hasRedundantExportAliasWarning = false
+  // local -> exported[]
+  const exportAliasRecord: Record<string, string[]> = {}
 
-  // localSpecifier -> locationInfo
-  const exportedAliasLocationMap: LocationMap = {}
-
+  // exported -> local
   const exportAliases = namedExports.reduce<Record<string, string>>((res, e) => {
-    if (e.local !== e.exported) {
+    if (e.local !== e.exported)
       res[e.exported] = e.local
-
-      exportedAliasLocationMap[e.local] = {
-        start: e.start,
-        end: e.end,
-      }
-
-      patchDataFromName(e.local, e.exported)
-    }
 
     return res
   }, {})
 
   debug('Export aliases: %O', exportAliases)
 
-  const reversedExportAliases = Object.entries(exportAliases).reduce<Record<string, string>>((res, [exported, local]) => {
-    const alias = res[local]
+  // local -> exported
+  const reversedExportAliases = types.reduce<Record<string, string>>((res, maybeAlias) => {
+    const localName = exportAliases[maybeAlias]
 
-    if (isString(alias)) {
-      const loc = exportedAliasLocationMap[local]
-
-      hasRedundantExportAliasWarning = true
-
-      warn(`ExportAlias "${exported}" is redundant because there is already an ExportAlias that exports the same type. ${LogMsg.UNEXPECTED_RESULT} ${LogMsg.SUGGEST_TYPE_ALIAS}`, {
-        fileName: relativePath,
-        codeFrame: generateCodeFrame(source, loc.start, loc.end),
-      })
+    if (!localName) {
+      // Skip when it is exactly the local name
+      return res
     }
 
-    res[local] = exported
+    const alias = res[localName]
+
+    // Add replacements to the existing's if we have already found an alias
+    if (isString(alias)) {
+      debug('Add replacements of %s to %s', maybeAlias, localName)
+
+      const targetRecord = getSharedMetaData(localName)!.replacementTargets!
+
+      const sourceRecord = getSharedMetaData(maybeAlias)!.replacementTargets!
+
+      emptyMetaData(maybeAlias)
+
+      targetRecord.push(...sourceRecord)
+    }
+    else {
+      res[localName] = maybeAlias
+
+      patchDataFromName(localName, maybeAlias)
+    }
+
+    exportAliasRecord[localName] ||= []
+    exportAliasRecord[localName].push(maybeAlias)
 
     return res
   }, {})
 
-  debug('Reversed export aliases: %O', reversedExportAliases)
-
-  // Apply export aliases (exported -> local) to find types (and dedupe them)
-  const processedTypes = Object.keys(types.reduce<Record<string, string>>((res, _name) => {
-    const name = exportAliases[_name] || _name
-    const value = res[name]
-
-    if (isString(value) && !hasRedundantExportAliasWarning) {
-      const loc = exportedAliasLocationMap[_name]
-
-      warn(`ExportSpecifier "${_name}" is redundant because there is already an ExportSpecifier that exports the same type. ${LogMsg.UNEXPECTED_RESULT} ${LogMsg.SUGGEST_TYPE_ALIAS}`, {
-        fileName: relativePath,
-        codeFrame: generateCodeFrame(source, loc.start, loc.end),
+  Object.entries(exportAliasRecord).forEach(([typeName, record]) => {
+    // Add metadata if it has multiple aliases
+    if (record.length > 1) {
+      setMetaData(typeName, {
+        hasDuplicateImports: true,
       })
     }
+  })
 
-    res[name] = name
+  debug('Reversed export aliases: %O', reversedExportAliases)
 
-    return res
-  }, {}))
+  // Unwrap export aliases (exported -> local) to find types (and dedupe them)
+  const processedTypes = [...new Set(types.map(name => exportAliases[name] || name))]
 
   debug('Processed types: %O', processedTypes)
 
   // SFC only variables (i.e. It will only be used in the first recursion)
-  const extraSpecifiers: string[] = []
   const sourceReplacements: Replacement[] = []
 
   const extractFromPosition = (start: MaybeNumber, end: MaybeNumber) =>
@@ -478,8 +501,12 @@ export async function extractTypesFromSource(
     return extractAliases[name] || name
   }
 
-  function withPath(name: string): string {
+  function withPath(name: string): NameWithPath {
     return `${relativePath}:${name}`
+  }
+
+  function unwrapPath(key: NameWithPath): string {
+    return at(key.split(':'), -1)
   }
 
   function setNamesMap(fullName: FullName, nameWithPath: NameWithPath) {
@@ -487,24 +514,67 @@ export async function extractTypesFromSource(
     extractedNamesMap[fullName] = nameWithPath
   }
 
-  function getMetaData(name: string): TypeMetaData | undefined {
-    return metaDataMap[name]
+  function getSharedMetaData(name: string): TypeMetaData | undefined {
+    return localMetaDataMap[name]
   }
 
-  function setMetaData(name: string, val: TypeMetaData): void {
-    const metaData = metaDataMap[name]
+  function getMetaData(name: string): LocalTypeMetaData | undefined {
+    return localMetaDataMap[name]
+  }
 
-    if (metaData)
-      debug('Override metadata: %s => %O => %O', name, metaData, val)
-    else
+  function getReplacementRecord(name: string): ReplacementRecord[] | undefined {
+    return getSharedMetaData(name)!.replacementTargets
+  }
+
+  function setMetaData(name: string, val: LocalTypeMetaData): LocalTypeMetaData {
+    const metaData = localMetaDataMap[name]
+
+    if (metaData) {
+      const mergedMetaData: LocalTypeMetaData = {
+        ...metaData,
+        ...val,
+      }
+
+      debug('Overriding metadata: %s => %O => %O', name, metaData, mergedMetaData)
+      return localMetaDataMap[name] = mergedMetaData
+    }
+    else {
       debug('Set metadata: %s => %O', name, val)
+      return localMetaDataMap[name] = val
+    }
+  }
 
-    metaDataMap[name] = val
+  function emptyMetaData(name: string) {
+    debug('Empty metadata %s', name)
+    localMetaDataMap[name] = undefined
   }
 
   function patchDataFromName(name: string, from: string) {
     debug('Patching data for %s from %s', name, from)
-    setMetaData(name, getMetaData(from)!)
+
+    const sourceRecord = getSharedMetaData(name)?.replacementTargets
+
+    const targetRecord = (setMetaData(name, getSharedMetaData(from)!) as TypeMetaData).replacementTargets!
+
+    emptyMetaData(from)
+
+    /**
+     * If sourceRecord exists, it means that user also imported the original (local) name of the type
+     * @example
+     * ```typescript
+     * import { Foo, Bar } from './foo'
+     * ```
+     * foo.ts
+     * ```typescript
+     * export { Foo, Foo as Bar }
+     * ```
+     */
+    if (sourceRecord?.length) {
+      targetRecord.push(...sourceRecord)
+
+      exportAliasRecord[name] ||= []
+      exportAliasRecord[name].push(name)
+    }
 
     extractAliases[name] = extractAliases[from] || from
   }
@@ -554,18 +624,78 @@ export async function extractTypesFromSource(
     return result
   }
 
-  function addTypeReplacement(key: string, replacement: Replacement): number {
-    debug('Add type replacement: %s => %O', key, replacement)
+  function convertFullNameToName(fullName: FullName): string {
+    const fullNameRE = /(_VTI_TYPE_)?([\w\d$_]+)/g
 
-    return extractedTypeReplacements[key].replacements.push(replacement) - 1
+    const matches = fullName.matchAll(fullNameRE)
+
+    let result = ''
+
+    for (const m of matches) {
+      const arr = m[2].split('_')
+
+      // Remove prefix if exists
+      if (isNumber(parseInt(at(arr, -1))))
+        arr.pop()
+
+      result = arr.join('_')
+    }
+
+    return result
   }
 
-  function addDependencyToType(key: string, dependency: string): number {
+  function addReplacementRecord(name: string, record: ReplacementRecord) {
+    debug('Add replacement record: %s -> %O', name, record)
+
+    replacementRecord[name] ||= []
+
+    replacementRecord[name].push(record)
+  }
+
+  function addTypeReplacement(key: string, replacement: Replacement) {
+    debug('Add type replacement: %s => %O', key, replacement)
+
+    extractedTypeReplacements[key].replacements.push(replacement)
+  }
+
+  function addDependencyToType(key: string, dependency: string) {
     debug('Add dependency: %s => %s', key, dependency)
 
     const extractedTypeInfo = extractedTypes.get(key)!
 
-    return extractedTypeInfo.dependencies!.push(dependency) - 1
+    extractedTypeInfo.dependencies!.push(dependency)
+  }
+
+  // Change the name (the content of replacements) to the already extracted's
+  function changeReplacementContent(replacementRecord: ReplacementRecord[], fullName: FullName) {
+    const record: Record<string, string[]> = {}
+
+    replacementRecord.forEach(({ target, source }) => {
+      if (target === fullName || record[source]?.includes(target))
+        return
+
+      record[source] ||= []
+      record[source].push(target)
+
+      const sourceTypeInfo = extractedTypes.get(source)!
+
+      const replacement = extractedTypeReplacements[source]
+
+      replacement.replacements = replacement.replacements.map<Replacement>((r) => {
+        if (r.replacement === target) {
+          debug('Change name: %s -> %s', r.replacement, fullName)
+
+          return {
+            ...r,
+            replacement: fullName,
+          }
+        }
+
+        return r
+      })
+
+      sourceTypeInfo.dependencies = sourceTypeInfo.dependencies!.map(dep => dep === target ? fullName : dep)
+    })
   }
 
   function removeTypeFromSource(node: Exclude<TSTypes, TSEnumDeclaration>) {
@@ -631,7 +761,7 @@ export async function extractTypesFromSource(
   function extractTypeByName(_name: string) {
     const name = _name
 
-    const { referenceSource, replacementIndex, dependencyIndex } = metaDataMap[name] || {}
+    const replacementRecord = getReplacementRecord(name)
 
     const key = withPath(name)
 
@@ -639,16 +769,10 @@ export async function extractTypesFromSource(
     if (extractedTypes.has(key)) {
       debug('Skipping type: %s', name)
 
-      // Change the name to the already extracted's
-      if (referenceSource) {
+      if (replacementRecord?.length) {
         const { fullName } = extractedTypes.get(key)!
 
-        const replacements = extractedTypeReplacements[referenceSource].replacements
-        const dependencies = extractedTypes.get(referenceSource)!.dependencies!
-
-        replacements[replacementIndex!].replacement = fullName
-        dependencies[dependencyIndex!] = fullName
-        debug('Change name: %s -> %s', name, fullName)
+        changeReplacementContent(replacementRecord, fullName)
       }
 
       return
@@ -659,13 +783,21 @@ export async function extractTypesFromSource(
     if (node) {
       const fullName = getFullName(name)
 
+      /**
+       * NOTE(zorin): Remove types from source if we are extracting types in SFC (except enum types),
+       * because we need to make sure the order is correct
+       */
       if (isInSFC && !isEnum(node))
         removeTypeFromSource(node)
 
       ExtractTypeByNode(node, fullName)
     }
     else {
-      const name = reversedExportAliases[_name] || _name
+      const exportedName = reversedExportAliases[_name]
+      const name = exportedName || _name
+
+      if (isString(exportedName))
+        setMetaData(exportedName, getMetaData(_name)!)
 
       if (isInSFC)
         extraSpecifiers.push(name)
@@ -702,36 +834,70 @@ export async function extractTypesFromSource(
       extractedTypeReplacements,
       interfaceExtendsRecord,
       metaDataMap,
+      extraSpecifiers,
     })
   }
 
-  const extractTypesFromTSUnionType = (union: TSUnionType, metaData: TypeMetaData) => {
+  function preReferenceExtraction(options: PreExtractionOptions): void {
+    const { name, replaceLocation, metaData } = options
+
     const { referenceSource } = metaData
 
-    let replacementIndex: number | undefined
-    let dependencyIndex: number | undefined
+    const fullName = getFullName(name)
+
+    addTypeReplacement(referenceSource, {
+      start: replaceLocation.start,
+      end: replaceLocation.end,
+      replacement: fullName,
+    })
+
+    addReplacementRecord(name, {
+      target: fullName,
+      source: referenceSource,
+    })
+
+    addDependencyToType(referenceSource, fullName)
+
+    setMetaData(name, metaData)
+  }
+
+  function postExtraction(options: PostExtractionOptions): void {
+    const { key, name, fullName, isEnum, metaData: { isUsedType, hasDuplicateImports } } = options
+
+    setNamesMap(fullName, key)
+
+    /**
+     * NOTE(zorin):Always add count for enum types
+     * There are 2 reasons:
+     * 1. I don't think users will use enum types in vue macros
+     * 2. Whether they are declared in SFC or not, their names will always be prefixed (Because users may use them as values)
+     *
+     * Also, we don't need to add count for types used directly in vue macros or types declared in SFC
+     * because they are not prefixed
+     */
+    if (isEnum || !(isUsedType || isInSFC))
+      addCount(name)
+
+    if (hasDuplicateImports)
+      changeReplacementContent(getReplacementRecord(name)!, fullName)
+  }
+
+  const extractTypesFromTSUnionType = (union: TSUnionType, metaData: ReferenceTypeMetaData) => {
+    const referenceSourceName = unwrapPath(metaData.referenceSource)
 
     union.types
       .filter((n): n is TSTypeReference => n.type === 'TSTypeReference')
       .forEach((typeReference) => {
-        if (typeReference.typeName.type === 'Identifier') {
+        if (typeReference.typeName.type === 'Identifier' && typeReference.typeName.name !== referenceSourceName) {
           const name = typeReference.typeName.name
-          const referenceFullName = getFullName(name)
 
-          if (referenceSource) {
-            replacementIndex = addTypeReplacement(referenceSource!, {
+          preReferenceExtraction({
+            name,
+            replaceLocation: {
               start: typeReference.start!,
               end: typeReference.end!,
-              replacement: referenceFullName,
-            })
-
-            dependencyIndex = addDependencyToType(referenceSource!, referenceFullName)
-          }
-
-          setMetaData(name, {
-            ...metaData,
-            replacementIndex,
-            dependencyIndex,
+            },
+            metaData: { ...metaData },
           })
 
           extractTypeByName(name)
@@ -739,7 +905,7 @@ export async function extractTypesFromSource(
       })
   }
 
-  function extractExtendInterfaces(interfaces: TSExpressionWithTypeArguments[], metaData: TypeMetaData) {
+  function extractExtendInterfaces(interfaces: TSExpressionWithTypeArguments[], metaData: LocalTypeMetaData) {
     for (const extend of interfaces) {
       if (extend.expression.type === 'Identifier') {
         const name = extend.expression.name
@@ -763,21 +929,7 @@ export async function extractTypesFromSource(
     const interfaceName = node.id.name
     const key = withPath(interfaceName)
 
-    const { sourceInterfaceName, isProperty, isUsedType } = getMetaData(interfaceName) || {}
-
-    // Skip all process, since Vue only transform the type of nested objects to 'Object'
-    if (isProperty) {
-      extractedTypes.set(key, {
-        typeKeyword: 'interface',
-        fullName,
-        body: '{}',
-      })
-
-      setNamesMap(fullName, key)
-
-      addCount(interfaceName)
-      return
-    }
+    const { extendTarget, isUsedType, hasDuplicateImports } = getMetaData(interfaceName) || {}
 
     const bodyStart = node.body.start!
     const bodyEnd = node.body.end!
@@ -792,30 +944,31 @@ export async function extractTypesFromSource(
       dependencies: [],
     })
 
-    setNamesMap(fullName, key)
+    postExtraction({
+      key,
+      fullName,
+      name: interfaceName,
+      metaData: {
+        isUsedType,
+        hasDuplicateImports,
+      },
+    })
 
-    /**
-     * NOTE(zorin): We don't need to add count for types used directly in vue macros or types declared in SFC
-     * because they are not prefixed
-     */
-    if (!(isUsedType || isInSFC))
-      addCount(interfaceName)
-
-    if (sourceInterfaceName) {
+    if (extendTarget) {
       /**
-       * NOTE(zorin): If the record does not exist, it means that the source interface comes from another file
+       * NOTE(zorin): If the record does not exist, it means that the interface which extends current interface comes from another file
        * So we need to initialize it
        */
-      interfaceExtendsRecord[sourceInterfaceName] ||= []
+      interfaceExtendsRecord[extendTarget] ||= []
 
-      interfaceExtendsRecord[sourceInterfaceName].push(key)
+      interfaceExtendsRecord[extendTarget].push(key)
     }
 
     if (extendsInterfaces) {
       interfaceExtendsRecord[key] = []
 
       extractExtendInterfaces(extendsInterfaces, {
-        sourceInterfaceName: key,
+        extendTarget: key,
       })
     }
 
@@ -835,29 +988,24 @@ export async function extractTypesFromSource(
         if (typeAnnotation?.type === 'TSUnionType') {
           extractTypesFromTSUnionType(typeAnnotation, {
             referenceSource: key,
-            isProperty: true,
           })
         }
         else if (
           typeAnnotation?.type === 'TSTypeReference'
           && typeAnnotation.typeName.type === 'Identifier'
+          && typeAnnotation.typeName.name !== interfaceName
         ) {
           const name = typeAnnotation.typeName.name
-          const referenceFullName = getFullName(name)
 
-          const replacementIndex = addTypeReplacement(key, {
-            start: typeAnnotation.start!,
-            end: typeAnnotation.end!,
-            replacement: referenceFullName,
-          })
-
-          const dependencyIndex = addDependencyToType(key, referenceFullName)
-
-          setMetaData(name, {
-            referenceSource: key,
-            replacementIndex,
-            dependencyIndex,
-            isProperty: true,
+          preReferenceExtraction({
+            name,
+            replaceLocation: {
+              start: typeAnnotation.start!,
+              end: typeAnnotation.end!,
+            },
+            metaData: {
+              referenceSource: key,
+            },
           })
 
           extractTypeByName(name)
@@ -874,7 +1022,7 @@ export async function extractTypesFromSource(
     const key = withPath(typeAliasName)
     const typeAnnotation = node.typeAnnotation
 
-    const { isUsedType } = metaDataMap[typeAliasName] || {}
+    const { isUsedType, hasDuplicateImports } = getMetaData(typeAliasName) || {}
 
     extractedTypes.set(key, {
       typeKeyword: 'type',
@@ -883,14 +1031,15 @@ export async function extractTypesFromSource(
       dependencies: [],
     })
 
-    setNamesMap(fullName, key)
-
-    /**
-     * NOTE(zorin): We don't need to add count for types used directly in vue macros or types declared in SFC
-     * because they are not prefixed
-     */
-    if (!(isUsedType || isInSFC))
-      addCount(typeAliasName)
+    postExtraction({
+      key,
+      fullName,
+      name: typeAliasName,
+      metaData: {
+        isUsedType,
+        hasDuplicateImports,
+      },
+    })
 
     extractedTypeReplacements[key] = {
       offset: -typeAnnotation.start!,
@@ -903,20 +1052,16 @@ export async function extractTypesFromSource(
     // TODO(zorin): Support TSLiteral, IntersectionType
     else if (typeAnnotation.type === 'TSTypeReference' && typeAnnotation.typeName.type === 'Identifier') {
       const name = typeAnnotation.typeName.name
-      const referenceFullName = getFullName(name)
 
-      const replacementIndex = addTypeReplacement(key, {
-        start: typeAnnotation.typeName.start!,
-        end: typeAnnotation.typeName.end!,
-        replacement: referenceFullName,
-      })
-
-      const dependencyIndex = addDependencyToType(key, referenceFullName)
-
-      setMetaData(name, {
-        referenceSource: key,
-        replacementIndex,
-        dependencyIndex,
+      preReferenceExtraction({
+        name,
+        replaceLocation: {
+          start: typeAnnotation.typeName.start!,
+          end: typeAnnotation.typeName.end!,
+        },
+        metaData: {
+          referenceSource: key,
+        },
       })
 
       extractTypeByName(name)
@@ -934,6 +1079,22 @@ export async function extractTypesFromSource(
     const key = withPath(enumName)
     const enumTypes: Set<string> = new Set()
 
+    const { hasDuplicateImports, referenceSource } = (getMetaData(enumName) || {}) as ReferenceTypeMetaData
+
+    const referenceSourceFile = at(referenceSource.split(':'), -2)
+
+    // Remove extra specifier if it is referenced from SFC
+    if (/\.vue$/.test(referenceSourceFile)) {
+      const name = convertFullNameToName(fullName)
+
+      if (name) {
+        extraSpecifiers.forEach((specifier, idx) => {
+          if (specifier === name)
+            extraSpecifiers.splice(idx, 1)
+        })
+      }
+    }
+
     // (semi-stable) Determine the type of enum, may not be able to process the use of complex scenes
     for (const member of node.members) {
       if (member.initializer) {
@@ -947,137 +1108,211 @@ export async function extractTypesFromSource(
       }
     }
 
+    const result = [...enumTypes].join(' | ')
+
+    let body = '/* enum */ '
+
+    if (result)
+      body += result
+    else
+      body = '/* empty-enum */ number | string'
+
     extractedTypes.set(key, {
       typeKeyword: 'type',
       fullName,
-      body: `${[...enumTypes].join(' | ') || 'number | string'};`,
+      body,
     })
 
-    setNamesMap(fullName, key)
-
-    /**
-     * NOTE(zorin): Always add count for enum types
-     * There are 2 reasons:
-     * 1. I don't think users will use enum types in vue macros
-     * 2. Whether they are declared in SFC or not, their names will always be prefixed (Because users may use them as values)
-     */
-    addCount(enumName)
+    postExtraction({
+      key,
+      fullName,
+      name: enumName,
+      metaData: {
+        hasDuplicateImports,
+      },
+      isEnum: true,
+    })
   }
 
-  async function findMissingTypes(missingTypes: string[], groupedImports: GroupedImports) {
-    debug('Missing types: %O', missingTypes)
-    debug('Grouped imports: %O', groupedImports)
+  /**
+   * TODO(zorin): Remove corresponding replacements and dependencies if we could not find the type
+   */
+  async function findMissingTypesFromImport(modulePath: string, aliases: Record<string, string>, missingTypes: string[]) {
+    debug('Find missing types %O from \'%s\'', missingTypes, modulePath)
+    // imported -> local[]
+    const importAliasRecord: Record<string, string[]> = {}
 
-    for (const [modulePath, importInfo] of Object.entries(groupedImports)) {
-      // Get intersection (it will dedupe the elements)
-      const intersection = intersect(importInfo.localSpecifiers, missingTypes)
+    // Generate new extract aliases (originalName -> userAlias) to replace the name of types
+    const newExtractAliases = missingTypes.reduce<Record<string, string>>((res, maybeAlias) => {
+      const originalName = aliases[maybeAlias]
 
-      debug('Intersection: %O', intersection)
+      if (!originalName) {
+        /**
+          * NOTE(zorin): Apply alias for `import { default } from 'foo'`
+          * In theory, this kind of syntax is only produced by the plugin (Users will get errors from TS if they write this kind of code)
+          * The plugin converts `export { default } from 'foo'` to `import { default } from 'foo';export { default }`
+          */
+        if (maybeAlias === 'default') {
+          const alias = extractAliases.default
+          res.default = alias
+          setMetaData(alias, getMetaData('default')!)
+        }
 
-      if (intersection.length) {
-        const moduleImportAliases = importInfo.aliases
-        const locationMap = importInfo.locationMap
-
-        let hasRedundantAliasWarning = false
-
-        // Generate new extract aliases (originalName -> userAlias) to replace the name of types
-        const newExtractAliases = intersection.reduce<Record<string, string>>((res, maybeAlias) => {
-          const originalName = moduleImportAliases[maybeAlias]
-
-          if (!originalName) {
-            /**
-             * NOTE(zorin): Apply alias for `import { default as default } from 'foo'`
-             * In theory, this kind of syntax is only produced by the plugin
-             */
-            if (maybeAlias === 'default') {
-              const alias = extractAliases.default
-              res.default = alias
-              setMetaData(alias, getMetaData('default')!)
-            }
-
-            // Skip when it is exactly the imported name
-            return res
-          }
-
-          const alias = res[originalName]
-
-          if (isString(alias)) {
-            const loc = locationMap[maybeAlias]
-
-            hasRedundantAliasWarning = true
-
-            warn(`ImportAlias "${maybeAlias}" is redundant because there is already an ImportAlias that imports the same type. ${LogMsg.UNEXPECTED_RESULT} ${LogMsg.SUGGEST_TYPE_ALIAS}`, {
-              fileName: relativePath,
-              codeFrame: generateCodeFrame(source, loc.start, loc.end),
-            })
-          }
-
-          res[originalName] = maybeAlias
-
-          return res
-        }, {})
-
-        debug('New extract aliases: %O', newExtractAliases)
-
-        // Apply aliases (userAlias -> originalName) to find types (and dedupe them)
-        const processedIntersection = Object.keys(intersection.reduce<Record<string, string>>((res, _name) => {
-          const name = moduleImportAliases[_name] || _name
-          const value = res[name]
-
-          if (isString(value) && !hasRedundantAliasWarning) {
-            const loc = locationMap[_name]
-
-            warn(`ImportSpecifier "${_name}" is redundant because there is already an ImportSpecifier that imports the same type. ${LogMsg.UNEXPECTED_RESULT} ${LogMsg.SUGGEST_TYPE_ALIAS}`, {
-              fileName: relativePath,
-              codeFrame: generateCodeFrame(source, loc.start, loc.end),
-            })
-          }
-
-          res[name] = name
-
-          return res
-        }, {}))
-
-        debug('Processed intersection: %O', processedIntersection)
-
-        // Generate aliases that apply the existing extract aliases for new extract aliases if exists
-        const processedNewExtractAliases = Object.fromEntries(Object.entries(newExtractAliases).map(([originalName, userAlias]) => [originalName, extractAliases[userAlias] || userAlias]))
-
-        debug('Processed new extract aliases: %O', processedNewExtractAliases)
-
-        // Generate new metadata map from the missing types
-        const newMetaDataMap = processedIntersection.reduce<Record<string, TypeMetaData>>((res, typeName) => {
-          // Apply new extract alias if exists
-          const metaData = getMetaData(newExtractAliases[typeName] || typeName)
-
-          if (metaData)
-            res[typeName] = metaData
-
-          return res
-        }, {})
-
-        await extractTypesFromModule(modulePath, processedIntersection, processedNewExtractAliases, newMetaDataMap)
+        // Skip when it is exactly the imported name
+        return res
       }
-    }
+
+      const alias = res[originalName]
+
+      // Add replacements to the existing's if we have already found an alias
+      if (isString(alias)) {
+        debug('Add replacements of %s to %s', maybeAlias, alias)
+
+        const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
+
+        const sourceRecord = replacementRecord[maybeAlias] || getSharedMetaData(maybeAlias)!.replacementTargets!
+
+        targetRecord.push(...sourceRecord)
+      }
+      else {
+        res[originalName] = maybeAlias
+      }
+
+      importAliasRecord[originalName] ||= []
+      importAliasRecord[originalName].push(maybeAlias)
+
+      return res
+    }, {})
+
+    Object.entries(importAliasRecord).forEach(([typeName, record]) => {
+      // Add metadata if it has multiple aliases
+      if (record.length > 1) {
+        const alias = newExtractAliases[typeName]
+
+        setMetaData(alias, {
+          hasDuplicateImports: true,
+        })
+      }
+    })
+
+    debug('New extract aliases: %O', newExtractAliases)
+
+    // Apply aliases and record the number of times each type appears (also we dedupe them in this step)
+    const typeCounter = missingTypes.reduce<Record<string, number>>((counter, _name) => {
+      const name = aliases[_name] || _name
+
+      counter[name] ??= 0
+
+      counter[name] += 1
+
+      return counter
+    }, {})
+
+    // Unwrap aliases (userAlias -> originalName) to find types
+    const processedMissingTypes = Object.entries(typeCounter).map(([typeName, count]) => {
+      /**
+        * If the type has duplicate imports and its number does not match the number of its aliases,
+        * it means that the user also imported the original(exported) name of the type
+        * @example
+        * ```typescript
+        * import { Foo, Foo as Bar } from 'foo'
+        * ```
+        */
+      if (count > 1 && count !== importAliasRecord[typeName].length) {
+        const alias = newExtractAliases[typeName]
+
+        debug('Push replacements of %s to %s (Original)', typeName, alias)
+
+        const targetRecord = replacementRecord[alias] || getSharedMetaData(alias)!.replacementTargets!
+
+        const sourceRecord = replacementRecord[typeName] || getSharedMetaData(typeName)!.replacementTargets!
+
+        targetRecord.push(...sourceRecord)
+
+        setMetaData(alias, {
+          hasDuplicateImports: true,
+        })
+      }
+
+      return typeName
+    })
+
+    debug('Processed missing types: %O', processedMissingTypes)
+
+    // Generate aliases that apply the existing extract aliases for new extract aliases if exists
+    const processedNewExtractAliases = Object.fromEntries(Object.entries(newExtractAliases).map(([originalName, userAlias]) => [originalName, extractAliases[userAlias] || userAlias]))
+
+    debug('Processed new extract aliases: %O', processedNewExtractAliases)
+
+    // Generate new metadata map from the missing types
+    const newMetaDataMap = processedMissingTypes.reduce<Record<string, TypeMetaData>>((res, typeName) => {
+      // Apply new extract alias if exists
+      const name = newExtractAliases[typeName] || typeName
+      const metaData = getMetaData(name)
+
+      if (metaData) {
+        (metaData as TypeMetaData).replacementTargets ||= replacementRecord[name]
+
+        res[typeName] = metaData
+      }
+
+      return res
+    }, {})
+
+    await extractTypesFromModule(modulePath, processedMissingTypes, processedNewExtractAliases, newMetaDataMap)
+  }
+
+  async function findMissingTypes(missingTypes: string[], groupImportsResult: GroupedImportsResult): Promise<string[]> {
+    const unresolved: string[] = []
+
+    const { groupedImports, localSpecifierMap } = groupImportsResult
+
+    debug('Grouped imports: %O', groupedImports)
+    debug('Local specifier map: %O', localSpecifierMap)
+
+    const resolvedImports = missingTypes.reduce<Record<string, string[]>>((res, typeName) => {
+      const modulePath = localSpecifierMap[typeName]
+
+      if (isString(modulePath)) {
+        res[modulePath] ||= []
+        res[modulePath].push(typeName)
+      }
+      else {
+        warn(`Cannot find type: ${typeName}`)
+        unresolved.push(typeName)
+      }
+
+      return res
+    }, {})
+
+    for (const [modulePath, types] of Object.entries(resolvedImports))
+      await findMissingTypesFromImport(modulePath, groupedImports[modulePath], [...new Set(types)])
+
+    return unresolved
   }
 
   for (const typeName of processedTypes)
     extractTypeByName(typeName)
 
-  debug('MetaData Map After: %O', metaDataMap)
+  debug('Local metadata map (after): %O', localMetaDataMap)
+  debug('Replacement record: %O', replacementRecord)
 
   if (missingTypes.local.length) {
     debug('Find missing types (Local)')
 
-    await findMissingTypes(missingTypes.local, groupedImports)
+    await findMissingTypes(missingTypes.local, groupedImportsResult)
   }
 
   if (missingTypes.requested.length) {
     debug('Find missing types (Requested)')
 
-    const groupedExports = groupImports(convertExportsToImports([...namedExports, ...namedFromExports], groupedImports), source, relativePath)
+    /**
+     * NOTE(zorin): For development convenience, we currently convert the export syntaxes to import syntaxes.
+     * This behavior may be changed in the future
+     */
+    const groupedExportsResult = groupImports(convertExportsToImports([...namedExports, ...namedFromExports], groupedImportsResult), source, relativePath)
 
-    await findMissingTypes(missingTypes.requested, groupedExports)
+    await findMissingTypes(missingTypes.requested, groupedExportsResult)
   }
 
   return {

@@ -1,5 +1,36 @@
 // Vitest Snapshot v1
 
+exports[`Dynamic > Enum types > Default > index.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* enum */ number
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+import { Foo } from './_types'
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Enum types > Default > local.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = /* enum */ number
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+// Weird output when using eslint, disable it temporarily
+/* eslint-disable eslint-comments/no-unlimited-disable */
+/* eslint-disable */
+enum Foo {
+  Bar,
+  Baz,
+  Qux,
+}
+defineProps<Props>()
+</script>
+"
+`;
+
 exports[`Dynamic > Interface extends interface > Has reference > 1.vue (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 type Baz = boolean
@@ -73,10 +104,14 @@ defineProps<Props>()
 
 exports[`Dynamic > Interface extends interface > Has reference > external_2.vue (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-interface _VTI_TYPE_BaseProps {}
+type _VTI_TYPE_Baz = boolean
+interface _VTI_TYPE_BaseProps {
+  baz: _VTI_TYPE_Baz
+}
 type Bar = number
 type Foo = string
 interface Props {
+  baz: _VTI_TYPE_Baz
   foo: Foo
   bar: Bar
   base: _VTI_TYPE_BaseProps
@@ -88,10 +123,17 @@ defineProps<Props>()
 
 exports[`Dynamic > Interface extends interface > Has reference > external_3.vue (default) 1`] = `
 "<script lang=\\"ts\\" setup>
-interface _VTI_TYPE_BaseProps {}
+type _VTI_TYPE_Qux = 'qux'
+type _VTI_TYPE_Baz = boolean
+interface _VTI_TYPE_BaseProps {
+  qux: _VTI_TYPE_Qux
+  baz: _VTI_TYPE_Baz
+}
 type Bar = number
 type Foo = string
 interface Props {
+  qux: _VTI_TYPE_Qux
+  baz: _VTI_TYPE_Baz
   foo: Foo
   bar: Bar
   base: _VTI_TYPE_BaseProps

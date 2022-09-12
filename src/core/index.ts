@@ -75,6 +75,7 @@ export function finalize(types: string[], extractResult: ExtractResult): Finaliz
   })
 
   debug('Result: %O', result)
+  debug('Extra specifiers 3: %O', extraSpecifiers)
 
   // Collect replacements to clean up import specifiers
   importNodes.forEach((i) => {
@@ -143,6 +144,26 @@ export function finalize(types: string[], extractResult: ExtractResult): Finaliz
     }
   })
 
+  /**
+   * NOTE(zorin): Get the order of inlining types
+   * If the order is incorrect, Vue will not get the correct definition of types
+   *
+   * @example
+   * Correct:
+   * ```typescript
+   * type Foo = string
+   * type Bar = Foo
+   *
+   * interface Props {...}
+   * ```
+   * Wrong:
+   * ```typescript
+   * type Bar = Foo
+   * type Foo = string
+   *
+   * interface Props {...}
+   * ```
+   */
   const dependencies = resolveDependencies(result, namesMap, types)
 
   debug('Dependencies: %O', dependencies)

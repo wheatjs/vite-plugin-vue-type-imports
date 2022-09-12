@@ -4,7 +4,7 @@ const isProduction = process.env.NODE_ENV === 'production'
 
 export default defineConfig({
   define: {
-    'import.meta.vitest': 'undefined',
+    'process.env.VITEST': 'undefined',
   },
   minify: true,
   format: ['esm', 'cjs'],
