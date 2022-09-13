@@ -65,11 +65,8 @@ defineProps<User>()
 ```
 
 ## Known limitations
-- The following syntaxes are not supported currently:
-  - `import * as Foo from 'foo'`
-  - `export * from 'foo'`
+- Namespace imports like `import * as Foo from 'foo'` are not supported.
 - [These types](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html) are not supported.
-- Types imported from external packages are not fully supported right now.
 - The plugin currently only scans the content of `<script setup>`. Types defined in `<script>` will be ignored.
 
 ## Notes
