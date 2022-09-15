@@ -1,16 +1,14 @@
-import { existsSync, readFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { dirname, join, parse, relative } from 'path'
 import colors from 'picocolors'
 import _debug from 'debug'
 import fg from 'fast-glob'
-import { resolveModule } from 'local-pkg'
+import type { PackageInfo } from 'local-pkg'
+import { getPackageInfoSync, resolveModule } from 'local-pkg'
 import type { Alias, AliasOptions } from 'vite'
 import { babelParse, generateCodeFrame } from '@vue/compiler-sfc'
 import type { CallExpression, Node, Program, TSEnumDeclaration, TSInterfaceDeclaration, TSTypeAliasDeclaration } from '@babel/types'
 import type { ExtractedTypes, IExport, IImport } from './ast'
 import { DEFINE_EMITS, DEFINE_PROPS, PLUGIN_NAME, TS_TYPES_KEYS, WITH_DEFAULTS } from './constants'
-
-type Pkg = Partial<Record<'types' | 'typings', string>>
 
 /**
  * Type name prefixed with path
@@ -40,6 +38,18 @@ export type MaybeString = string | null | undefined
 export type MaybeNumber = number | null | undefined
 
 export type MaybeNode = Node | null | undefined
+
+type Pkg = PackageInfo['packageJson']
+
+interface PackageJSON extends Pkg {
+  types?: string
+  typings?: string
+  exports?: {
+    [p: string]: {
+      types?: string
+    }
+  }
+}
 
 /**
  * References:
@@ -104,26 +114,9 @@ export function matches(pattern: string | RegExp, importee: string) {
   return importeeStartsWithKey && importeeHasSlashAfterKey
 }
 
-// https://github.com/antfu/local-pkg/blob/main/index.mjs
-export function searchPackageJSON(dir: string): string | undefined {
-  let packageJsonPath
-  while (true) {
-    if (!dir)
-      return
-    const newDir = dirname(dir)
-    if (newDir === dir)
-      return
-
-    dir = newDir
-    packageJsonPath = join(dir, 'package.json')
-    if (existsSync(packageJsonPath))
-      break
-  }
-
-  return packageJsonPath
-}
-
 export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
+  const debug = createUtilsDebugger('resolvePath')
+
   const matchedEntry = aliases?.find(entry => matches(entry.find, path))
 
   // Path which is using aliases. e.g. '~/types'
@@ -141,29 +134,30 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
   if (!modulePath)
     return join(dirname(from), path)
 
-  // Result is a typescript declaration file. e.g. 'vue/macros-global.d.ts'
+  // Result is a typescript declaration file.
   if (dtsRE.test(modulePath)) {
     return modulePath
   }
   // Not a typescript file, find declaration file
-  // TODO(zorin): Still needs to be improved
   else {
-    const packageJsonPath = searchPackageJSON(modulePath)
+    const pkg = (getPackageInfoSync(path)?.packageJson || {}) as PackageJSON
 
-    if (!packageJsonPath)
-      return
+    const slashArr = path.split('/')
 
-    const { types, typings } = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as Pkg
+    let processedPath = '.'
 
-    let result: string | undefined
+    // Increase index for scoped packages
+    const index = slashArr[0][0] === '@' ? 2 : 1
 
-    try {
-      // @ts-expect-error allow result to be undefined
-      result = join(dirname(packageJsonPath), types || typings)
-    }
-    catch {}
+    // Get relative path if module path contains slashes
+    if (slashArr.length > index)
+      processedPath = `./${relative(slashArr.slice(0, index).join('/'), path)}`
 
-    return result
+    debug('Processed path: %s', processedPath)
+
+    const result: string = pkg.exports?.[processedPath]?.types || pkg.types || pkg.typings || parse(modulePath).name
+
+    return join(dirname(modulePath), result)
   }
 }
 

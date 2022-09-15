@@ -183,6 +183,17 @@ defineProps<Props>()
 "
 `;
 
+exports[`Common > Export all > Default > index.ts (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+type _VTI_TYPE_Foo = 'foo'
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
 exports[`Common > Import aliases > Default > index.ts (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 type _VTI_TYPE_Foo = number

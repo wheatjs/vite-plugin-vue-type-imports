@@ -90,6 +90,7 @@ export interface GetImportsResult {
 export interface GetExportsResult {
   namedExports: INamedExport[]
   namedFromExports: INamedFromExport[]
+  exportAllSources: string[]
 }
 
 export type NodeMap = Map<string, TSTypes>
@@ -136,6 +137,7 @@ export function getAvailableImportsFromAst(ast: Program): GetImportsResult {
 export function getAvailableExportsFromAst(ast: Program): GetExportsResult {
   const namedExports: INamedExport[] = []
   const namedFromExports: INamedFromExport[] = []
+  const exportAllSources: string[] = []
 
   const addExport = (node: ExportNamedDeclaration) => {
     for (const specifier of node.specifiers) {
@@ -178,11 +180,14 @@ export function getAvailableExportsFromAst(ast: Program): GetExportsResult {
       addExport(node)
     else if (node.type === 'ExportDefaultDeclaration')
       addDefaultExport(node)
+    else if (node.type === 'ExportAllDeclaration')
+      exportAllSources.push(node.source.value)
   }
 
   return {
     namedExports,
     namedFromExports,
+    exportAllSources,
   }
 }
 
@@ -410,7 +415,9 @@ export async function extractTypesFromSource(
   // Get external types
   const { imports, importNodes } = getAvailableImportsFromAst(ast)
 
-  const { namedExports, namedFromExports } = getAvailableExportsFromAst(ast)
+  const { namedExports, namedFromExports, exportAllSources } = getAvailableExportsFromAst(ast)
+
+  const hasExportAllDecl = !!exportAllSources.length
 
   debug('Relative path: %s', relativePath)
   debug('Counter: %O', extractedKeysCounter)
@@ -954,15 +961,8 @@ export async function extractTypesFromSource(
       },
     })
 
-    if (extendTarget) {
-      /**
-       * NOTE(zorin): If the record does not exist, it means that the interface which extends current interface comes from another file
-       * So we need to initialize it
-       */
-      interfaceExtendsRecord[extendTarget] ||= []
-
+    if (extendTarget)
       interfaceExtendsRecord[extendTarget].push(key)
-    }
 
     if (extendsInterfaces) {
       interfaceExtendsRecord[key] = []
@@ -1137,7 +1137,7 @@ export async function extractTypesFromSource(
   /**
    * TODO(zorin): Remove corresponding replacements and dependencies if we could not find the type
    */
-  async function findMissingTypesFromImport(modulePath: string, aliases: Record<string, string>, missingTypes: string[]) {
+  async function findMissingTypesFromImport(modulePath: string, missingTypes: string[], aliases: Record<string, string> = {}) {
     debug('Find missing types %O from \'%s\'', missingTypes, modulePath)
     // imported -> local[]
     const importAliasRecord: Record<string, string[]> = {}
@@ -1278,7 +1278,9 @@ export async function extractTypesFromSource(
         res[modulePath].push(typeName)
       }
       else {
-        warn(`Cannot find type: ${typeName}`)
+        if (!hasExportAllDecl)
+          warn(`Cannot find type: ${typeName}`)
+
         unresolved.push(typeName)
       }
 
@@ -1286,7 +1288,7 @@ export async function extractTypesFromSource(
     }, {})
 
     for (const [modulePath, types] of Object.entries(resolvedImports))
-      await findMissingTypesFromImport(modulePath, groupedImports[modulePath], [...new Set(types)])
+      await findMissingTypesFromImport(modulePath, [...new Set(types)], groupedImports[modulePath])
 
     return unresolved
   }
@@ -1297,10 +1299,14 @@ export async function extractTypesFromSource(
   debug('Local metadata map (after): %O', localMetaDataMap)
   debug('Replacement record: %O', replacementRecord)
 
+  const unresolvedTypes: string[] = []
+
   if (missingTypes.local.length) {
     debug('Find missing types (Local)')
 
-    await findMissingTypes(missingTypes.local, groupedImportsResult)
+    const unresolved = await findMissingTypes(missingTypes.local, groupedImportsResult)
+
+    unresolvedTypes.push(...unresolved)
   }
 
   if (missingTypes.requested.length) {
@@ -1312,7 +1318,16 @@ export async function extractTypesFromSource(
      */
     const groupedExportsResult = groupImports(convertExportsToImports([...namedExports, ...namedFromExports], groupedImportsResult), source, relativePath)
 
-    await findMissingTypes(missingTypes.requested, groupedExportsResult)
+    const unresolved = await findMissingTypes(missingTypes.requested, groupedExportsResult)
+
+    unresolvedTypes.push(...unresolved)
+  }
+
+  if (!isInSFC && unresolvedTypes.length && hasExportAllDecl) {
+    debug('Find missing types (Export all)')
+
+    for (const exportSource of exportAllSources)
+      await findMissingTypesFromImport(exportSource, unresolvedTypes)
   }
 
   return {
