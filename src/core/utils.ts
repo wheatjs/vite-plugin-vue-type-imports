@@ -89,10 +89,15 @@ export function debuggerFactory(namespace: string) {
 
 const createUtilsDebugger = debuggerFactory('Utils')
 
-export function getAst(content: string): Program {
+export function getAst(content: string, isTsx?: boolean): Program {
+  const plugins = ['typescript', 'topLevelAwait']
+
+  if (isTsx)
+    plugins.push('jsx')
+
   return babelParse(content, {
     sourceType: 'module',
-    plugins: ['typescript', 'topLevelAwait'],
+    plugins: plugins as any,
   }).program
 }
 
