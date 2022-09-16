@@ -207,3 +207,15 @@ defineProps<Props>()
 </script>
 "
 `;
+
+exports[`Dynamic > Tsx > Default > index.vue (default) 1`] = `
+"<script lang=\\"tsx\\" setup>
+interface Props {
+  foo: string
+}
+defineProps<Props>()
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const render = () => <div />
+</script>
+"
+`;
