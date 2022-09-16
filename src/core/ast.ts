@@ -38,7 +38,6 @@ import {
   isTSTypes,
   isWithDefaults,
   resolveModulePath,
-  warn,
 } from './utils'
 
 const enum Prefixes {
@@ -1279,7 +1278,7 @@ export async function extractTypesFromSource(
       }
       else {
         if (!hasExportAllDecl)
-          warn(`Cannot find type: ${typeName}`)
+          debug('Cannot find type: %s', typeName)
 
         unresolved.push(typeName)
       }
