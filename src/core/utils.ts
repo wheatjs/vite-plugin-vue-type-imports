@@ -97,7 +97,7 @@ export function getAst(content: string, isTsx?: boolean): Program {
 
   return babelParse(content, {
     sourceType: 'module',
-    plugins: plugins as any,
+    plugins,
   }).program
 }
 
