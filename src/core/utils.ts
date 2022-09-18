@@ -89,15 +89,10 @@ export function debuggerFactory(namespace: string) {
 
 const createUtilsDebugger = debuggerFactory('Utils')
 
-export function getAst(content: string, isTsx?: boolean): Program {
-  const plugins: import('@babel/parser').ParserPlugin[] = ['typescript', 'topLevelAwait']
-
-  if (isTsx)
-    plugins.push('jsx')
-
+export function getAst(content: string): Program {
   return babelParse(content, {
     sourceType: 'module',
-    plugins,
+    plugins: ['typescript', 'topLevelAwait', 'jsx'],
   }).program
 }
 
@@ -176,7 +171,11 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
   if (!maybePath)
     return null
 
-  let files = await fg([`${maybePath}`, `${maybePath}?(.d).ts`], {
+  // We follow the parsing order of typescript
+  // https://www.typescriptlang.org/docs/handbook/module-resolution.html#how-typescript-resolves-modules
+  // For modules: module > module/index
+  // For extensions: .ts > .tsx > .d.ts
+  let files = await fg([`${maybePath}.ts`, `${maybePath}.tsx`, `${maybePath}.d.ts`], {
     onlyFiles: true,
   })
 
@@ -184,7 +183,7 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
     /**
      * NOTE(zorin): We only scan index(.d).ts when the result is empty, otherwise it may cause 'ENOTDIR' error
      */
-    files = await fg([`${maybePath}/index?(.d).ts`], {
+    files = await fg([`${maybePath}/index.ts`, `${maybePath}/index.tsx`, `${maybePath}/index.d.ts`], {
       onlyFiles: true,
     })
   }

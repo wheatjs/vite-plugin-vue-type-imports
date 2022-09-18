@@ -31,6 +31,45 @@ defineProps<Props>()
 "
 `;
 
+exports[`Dynamic > Import priority > Preferred dts > index.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface _VTI_TYPE_Foo {
+  fromDTS: boolean
+}
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Import priority > Preferred ts > index.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface _VTI_TYPE_Foo {
+  fromTS: boolean
+}
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Import priority > Preferred tsx > index.vue (default) 1`] = `
+"<script lang=\\"ts\\" setup>
+interface _VTI_TYPE_Foo {
+  fromTSX: boolean
+}
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
 exports[`Dynamic > Interface extends interface > Has reference > 1.vue (default) 1`] = `
 "<script lang=\\"ts\\" setup>
 type Baz = boolean
@@ -208,7 +247,20 @@ defineProps<Props>()
 "
 `;
 
-exports[`Dynamic > Tsx > Default > index.vue (default) 1`] = `
+exports[`Dynamic > Tsx > Import tsx > index.vue (default) 1`] = `
+"<script lang=\\"tsx\\" setup>
+interface _VTI_TYPE_Foo {
+  fromTSX: boolean
+}
+interface Props {
+  foo: _VTI_TYPE_Foo
+}
+defineProps<Props>()
+</script>
+"
+`;
+
+exports[`Dynamic > Tsx > Lang tsx > index.vue (default) 1`] = `
 "<script lang=\\"tsx\\" setup>
 interface Props {
   foo: string

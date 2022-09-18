@@ -195,7 +195,7 @@ export async function transform(code: string, { id, aliases }: TransformOptions)
   if (!isTS || !scriptSetup.content)
     return code
 
-  const program = getAst(scriptSetup.content, scriptSetup.lang === 'tsx')
+  const program = getAst(scriptSetup.content)
 
   const interfaces = getUsedInterfacesFromAst(program)
 
