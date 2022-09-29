@@ -1,4 +1,6 @@
 import { parse } from '@vue/compiler-sfc'
+import MagicString from 'magic-string'
+import type { TransformResult } from 'vite'
 import type { ExtractResult, TypeMetaData } from './ast'
 import { extractTypesFromSource, getUsedInterfacesFromAst } from './ast'
 import { debuggerFactory, getAst, notNullish, replaceAtIndexes, resolveDependencies, resolveExtends } from './utils'
@@ -185,13 +187,13 @@ export function finalize(types: string[], extractResult: ExtractResult): Finaliz
   }
 }
 
-export async function transform(code: string, { id, aliases }: TransformOptions) {
+export async function transform(code: string, { id, aliases }: TransformOptions): Promise<TransformResult | void> {
   const {
     descriptor: { scriptSetup },
   } = parse(code)
 
   if (scriptSetup?.lang !== 'ts' || !scriptSetup.content)
-    return code
+    return
 
   const program = getAst(scriptSetup.content)
 
@@ -214,18 +216,32 @@ export async function transform(code: string, { id, aliases }: TransformOptions)
   const result = finalize(interfaces, extractResult)
 
   if (!result)
-    return code
+    return
 
   const { inlinedTypes, replacements } = result
 
-  const transformedCode = [
-    code.slice(0, scriptSetup.loc.start.offset),
-    // Types inlined by the plugin
+  const s = new MagicString(code)
+
+  // Add inlined types and replace import statements
+  const newScriptSetupContent = [
+    '',
     inlinedTypes,
-    // Replace import statements
     replaceAtIndexes(scriptSetup.content, replacements),
-    code.slice(scriptSetup.loc.end.offset),
+    '',
   ].join('\n')
 
-  return transformedCode
+  s.overwrite(scriptSetup.loc.start.offset, scriptSetup.loc.end.offset, newScriptSetupContent)
+
+  if (s.hasChanged()) {
+    return {
+      code: s.toString(),
+      get map() {
+        return s.generateMap({
+          source: id,
+          includeContent: true,
+          hires: true,
+        })
+      },
+    }
+  }
 }
