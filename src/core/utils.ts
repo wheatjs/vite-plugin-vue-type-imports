@@ -1,4 +1,4 @@
-import { dirname, join, parse, relative } from 'path'
+import { basename, dirname, join, relative } from 'path'
 import colors from 'picocolors'
 import _debug from 'debug'
 import fg from 'fast-glob'
@@ -92,7 +92,7 @@ const createUtilsDebugger = debuggerFactory('Utils')
 export function getAst(content: string): Program {
   return babelParse(content, {
     sourceType: 'module',
-    plugins: ['typescript', 'topLevelAwait'],
+    plugins: ['typescript', 'topLevelAwait', 'jsx'],
   }).program
 }
 
@@ -114,6 +114,10 @@ export function matches(pattern: string | RegExp, importee: string) {
   return importeeStartsWithKey && importeeHasSlashAfterKey
 }
 
+export function removeTSExtension(path: string): string {
+  return path.replace(/\.ts$/, '')
+}
+
 export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
   const debug = createUtilsDebugger('resolvePath')
 
@@ -128,7 +132,7 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
    * If the path is just a single dot, append '/index' to prevent incorrect results
    */
   const modulePath = resolveModule(path === '.' ? './index' : path)
-  const dtsRE = /.+\.d\.ts$/
+  const dtsRE = /\.d\.ts$/
 
   // Not a package. e.g. '../types'
   if (!modulePath)
@@ -136,7 +140,7 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
 
   // Result is a typescript declaration file.
   if (dtsRE.test(modulePath)) {
-    return modulePath
+    return removeTSExtension(modulePath)
   }
   // Not a typescript file, find declaration file
   else {
@@ -155,7 +159,7 @@ export function resolvePath(path: string, from: string, aliases: MaybeAliases) {
 
     debug('Processed path: %s', processedPath)
 
-    const result: string = pkg.exports?.[processedPath]?.types || pkg.types || pkg.typings || parse(modulePath).name
+    const result: string = removeTSExtension(pkg.exports?.[processedPath]?.types || pkg.types || pkg.typings || basename(modulePath))
 
     return join(dirname(modulePath), result)
   }
@@ -171,18 +175,13 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
   if (!maybePath)
     return null
 
-  let files = await fg([`${maybePath}`, `${maybePath}?(.d).ts`], {
+  // We follow the parsing order of typescript
+  // https://www.typescriptlang.org/docs/handbook/module-resolution.html#how-typescript-resolves-modules
+  // For modules: module > module/index
+  // For extensions: .ts > .tsx > .d.ts
+  const files = await fg([`${maybePath}.ts`, `${maybePath}.tsx`, `${maybePath}.d.ts`, `${maybePath}/index.ts`, `${maybePath}/index.tsx`, `${maybePath}/index.d.ts`], {
     onlyFiles: true,
   })
-
-  if (!files.length) {
-    /**
-     * NOTE(zorin): We only scan index(.d).ts when the result is empty, otherwise it may cause 'ENOTDIR' error
-     */
-    files = await fg([`${maybePath}/index?(.d).ts`], {
-      onlyFiles: true,
-    })
-  }
 
   debug('Matched files: %O', files)
 
@@ -191,8 +190,6 @@ export async function resolveModulePath(path: string, from: string, aliases?: Ma
 
   return null
 }
-
-export type LocationMap = Record<string, Pick<IImport, 'start' | 'end'>>
 
 export type GroupedImports = Record<string, Record<string, string>>
 

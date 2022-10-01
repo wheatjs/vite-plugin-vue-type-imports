@@ -8,9 +8,10 @@
     "strict": true,
     "strictNullChecks": true,
     "resolveJsonModule": true,
+    "jsx": "preserve",
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "types": ["vitest/globals", "vitest/importMeta"],
+    "types": ["vitest/globals", "vitest/importMeta", "@vue/runtime-dom"],
     "forceConsistentCasingInFileNames": true
   },
   "exclude": [

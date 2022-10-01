@@ -192,7 +192,9 @@ export async function transform(code: string, { id, aliases }: TransformOptions)
     descriptor: { scriptSetup },
   } = parse(code)
 
-  if (scriptSetup?.lang !== 'ts' || !scriptSetup.content)
+  const isTS = scriptSetup && (scriptSetup.lang === 'ts' || scriptSetup.lang === 'tsx')
+
+  if (!isTS || !scriptSetup.content)
     return
 
   const program = getAst(scriptSetup.content)
