@@ -1,26 +1,27 @@
 {
   "name": "vite-plugin-vue-type-imports",
   "version": "0.2.2",
-  "types": "dist/index.d.ts",
-  "license": "MIT",
   "author": "Jacob Clevenger <jacobrclevenger@gmail.com>",
-  "bugs": "https://github.com/wheatjs/vite-plugin-vue-type-imports/issues",
+  "license": "MIT",
   "homepage": "https://github.com/wheatjs/vite-plugin-vue-type-imports",
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "bugs": "https://github.com/wheatjs/vite-plugin-vue-type-imports/issues",
+  "keywords": [],
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
     },
     "./nuxt": {
       "require": "./dist/nuxt.js",
       "import": "./dist/nuxt.mjs"
     }
   },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "cross-env NODE_ENV=production tsup",
     "dev": "cross-env NODE_ENV=development tsup --watch src",
@@ -36,7 +37,18 @@
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "coverage": "vitest run --coverage"
   },
-  "keywords": [],
+  "peerDependencies": {
+    "@vue/compiler-sfc": "^3.2.24",
+    "vue": "^3.2.24"
+  },
+  "dependencies": {
+    "@babel/types": "^7.19.0",
+    "debug": "^4.3.4",
+    "fast-glob": "^3.2.12",
+    "local-pkg": "^0.4.2",
+    "magic-string": "^0.26.4",
+    "picocolors": "^1.0.0"
+  },
   "devDependencies": {
     "@antfu/eslint-config": "^0.26.3",
     "@antfu/ni": "^0.18.0",
@@ -55,17 +67,5 @@
     "vite": "^3.1.0",
     "vitest": "^0.23.1",
     "vue": "^3.2.39"
-  },
-  "peerDependencies": {
-    "@vue/compiler-sfc": "^3.2.24",
-    "vue": "^3.2.24"
-  },
-  "dependencies": {
-    "@babel/types": "^7.19.0",
-    "debug": "^4.3.4",
-    "fast-glob": "^3.2.12",
-    "local-pkg": "^0.4.2",
-    "magic-string": "^0.26.4",
-    "picocolors": "^1.0.0"
   }
 }
