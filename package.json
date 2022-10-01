@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-vue-type-imports",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "author": "Jacob Clevenger <jacobrclevenger@gmail.com>",
   "license": "MIT",
   "homepage": "https://github.com/wheatjs/vite-plugin-vue-type-imports",
