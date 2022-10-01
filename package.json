@@ -65,6 +65,7 @@
     "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
     "local-pkg": "^0.4.2",
+    "magic-string": "^0.26.4",
     "picocolors": "^1.0.0"
   }
 }

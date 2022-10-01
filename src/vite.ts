@@ -17,14 +17,12 @@ export default function VitePluginVueTypeImports(): Plugin {
 
       const aliases = resolvedConfig?.resolve.alias
 
-      const transformedCode = await transform(code, {
+      const transformResult = await transform(code, {
         id,
         aliases,
       })
 
-      return {
-        code: transformedCode,
-      }
+      return transformResult
     },
   }
 }

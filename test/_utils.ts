@@ -99,7 +99,7 @@ export function defineTransformTest(options: DefineTransformTestOptions) {
           const code = await codeGetter(metaData)
           const result = await transform(code, metaData.options)
 
-          expect(result).toMatchSnapshot()
+          expect(result!.code).toMatchSnapshot()
         })
       })
     })
