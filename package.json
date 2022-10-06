@@ -38,11 +38,12 @@
     "coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "@vue/compiler-sfc": "^3.2.24",
-    "vue": "^3.2.24"
+    "vite": "^3.0.0",
+    "vue": "^2.7.0 || ^3.2.24"
   },
   "dependencies": {
     "@babel/types": "^7.19.0",
+    "@vue/compiler-sfc": "^3.2.24",
     "debug": "^4.3.4",
     "fast-glob": "^3.2.12",
     "local-pkg": "^0.4.2",
@@ -56,7 +57,6 @@
     "@types/node": "^18.7.16",
     "@vitest/coverage-c8": "^0.23.1",
     "@vitest/ui": "^0.23.1",
-    "@vue/compiler-sfc": "^3.2.39",
     "bumpp": "^8.2.1",
     "cross-env": "^7.0.3",
     "eslint": "^8.23.0",
@@ -64,7 +64,7 @@
     "git-ensure": "^0.1.0",
     "tsup": "6.2.3",
     "typescript": "^4.8.3",
-    "vite": "^3.1.0",
+    "vite": "^3.0.0",
     "vitest": "^0.23.1",
     "vue": "^3.2.39"
   }
