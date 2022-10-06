@@ -1,7 +1,7 @@
 <h2 align="center">vite-plugin-vue-type-imports</h2>
 
 <p align="center">
-  Enables you to import types and use them in your <code>defineProps</code> and <code>defineEmits</code>
+  Enables you to import types and use them in your <code>defineProps</code> and <code>defineEmits</code>. Supports both Vue 2 and Vue 3.
 </p>
 
 <p align="center">
